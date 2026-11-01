@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,10 +8,7 @@ namespace SpinForFortune
     public class RouletteUI : MonoBehaviour
     {
         private static RouletteUI instance;
-        private static int progressionHeat;
-        private static int progressionStreak;
         private static float progressionFeverSeconds;
-        private static bool progressionVisible;
 
         private static readonly Color[] SymbolColors =
         {
@@ -38,12 +35,9 @@ namespace SpinForFortune
         public static string PackageRoot;
         private const float MasterVolume = 0.1f;
         private Text caption;
-        private Text statusText;
-        private Image statusBackground;
-        private Image statusHeatBar;
         private Font font;
 
-        private RouletteSfx tickClip, stopClip, reachClip, missClip, winClip, jackpotClip;
+        private RouletteSfx tickClip, stopClip, reachClip, missClip, winClip, jackpotClip, feverClip;
 
         private RouletteSpin spin;
         private bool active;
@@ -83,19 +77,13 @@ namespace SpinForFortune
             instance.Begin(spin, freeNumber, freeLimit);
         }
 
-        public static void SetProgression(int heat, int streak, float feverSeconds, bool visible)
+        public static void SetFever(float feverSeconds)
         {
             bool feverStarted = progressionFeverSeconds <= 0f && feverSeconds > 0f;
-            progressionHeat = Mathf.Clamp(heat, 0, RouletteProgression.MaxHeat);
-            progressionStreak = Mathf.Max(0, streak);
             progressionFeverSeconds = Mathf.Clamp(feverSeconds, 0f, RouletteProgression.MaxFeverDuration);
-            progressionVisible = visible;
-            if (instance != null)
-            {
-                instance.RefreshProgression();
-                if (feverStarted)
-                    instance.ShowFever();
-            }
+            RouletteFeverFrameUI.SetVisible(progressionFeverSeconds > 0f);
+            if (instance != null && feverStarted)
+                instance.ShowFever();
         }
 
         private void Begin(RouletteSpin newSpin, int freeNumber, int freeLimit)
@@ -126,18 +114,11 @@ namespace SpinForFortune
             panelGroup.alpha = 1f;
             panel.anchoredPosition = PanelBasePosition;
             canvasObject.SetActive(true);
-            RefreshProgression();
         }
 
         private void Update()
         {
             float dt = Time.deltaTime;
-            if (progressionFeverSeconds > 0f)
-            {
-                progressionFeverSeconds = Mathf.Max(0f, progressionFeverSeconds - dt);
-                RefreshProgression();
-            }
-
             if (!active)
             {
                 UpdateEffects(dt);
@@ -166,7 +147,7 @@ namespace SpinForFortune
                 if (resultTimer > ResultHoldSeconds + FadeSeconds)
                 {
                     active = false;
-                    canvasObject.SetActive(progressionVisible);
+                    canvasObject.SetActive(false);
                 }
             }
         }
@@ -470,60 +451,14 @@ namespace SpinForFortune
             caption.rectTransform.anchoredPosition = new Vector2(0f, 7f);
             caption.gameObject.AddComponent<Outline>().effectColor = Color.black;
 
-            statusBackground = MakeImage(canvasObject.transform, "ProgressBackground", new Color(0.08f, 0.03f, 0.08f, 0.9f));
-            statusBackground.rectTransform.anchorMin = statusBackground.rectTransform.anchorMax = new Vector2(1f, 0f);
-            statusBackground.rectTransform.pivot = new Vector2(1f, 0f);
-            statusBackground.rectTransform.sizeDelta = new Vector2(300f, 26f);
-            statusBackground.rectTransform.anchoredPosition = new Vector2(-40f, 198f);
-
-            statusText = MakeText(statusBackground.transform, "Progress", 14, TextAnchor.MiddleCenter);
-            Stretch(statusText.rectTransform);
-            statusText.rectTransform.offsetMin = new Vector2(4f, 2f);
-            statusText.rectTransform.offsetMax = new Vector2(-4f, -2f);
-            statusText.gameObject.AddComponent<Outline>().effectColor = Color.black;
-
-            statusHeatBar = MakeImage(canvasObject.transform, "HeatBar", new Color(1f, 0.55f, 0.1f, 1f));
-            statusHeatBar.type = Image.Type.Filled;
-            statusHeatBar.fillMethod = Image.FillMethod.Horizontal;
-            statusHeatBar.fillOrigin = (int)Image.OriginHorizontal.Left;
-            statusHeatBar.rectTransform.anchorMin = statusHeatBar.rectTransform.anchorMax = new Vector2(1f, 0f);
-            statusHeatBar.rectTransform.pivot = new Vector2(1f, 0f);
-            statusHeatBar.rectTransform.sizeDelta = new Vector2(292f, 3f);
-            statusHeatBar.rectTransform.anchoredPosition = new Vector2(-44f, 198f);
-
             BuildClips();
 
             canvasObject.SetActive(false);
-            RefreshProgression();
-        }
-
-        private void RefreshProgression()
-        {
-            if (statusText == null)
-                return;
-
-            statusBackground.enabled = progressionVisible;
-            statusText.gameObject.SetActive(progressionVisible);
-            statusHeatBar.enabled = progressionVisible;
-            if (progressionVisible)
-            {
-                statusText.text = progressionFeverSeconds > 0f
-                    ? $"FEVER {progressionFeverSeconds:0.0}s | HEAT {progressionHeat}/{RouletteProgression.MaxHeat} | STREAK {progressionStreak}"
-                    : $"HEAT {progressionHeat}/{RouletteProgression.MaxHeat} | STREAK {progressionStreak}";
-                statusHeatBar.fillAmount = progressionHeat / (float)RouletteProgression.MaxHeat;
-                statusHeatBar.color = progressionFeverSeconds > 0f
-                    ? new Color(1f, 0.85f, 0.2f, 1f)
-                    : new Color(1f, 0.45f + 0.4f * statusHeatBar.fillAmount, 0.1f, 1f);
-            }
-
-            if (!active && canvasObject != null)
-                canvasObject.SetActive(progressionVisible);
         }
 
         private void ShowFever()
         {
-            Flash(new Color(1f, 0.8f, 0.15f), 0.8f, 0.7f, 18f);
-            Play(winClip, 1.2f);
+            Play(feverClip, 0.8f);
         }
 
         private static Font LoadFont()
@@ -583,6 +518,7 @@ namespace SpinForFortune
                 Mathf.Sin(2f * Mathf.PI * (t < d / 2f ? 330f : 220f) * t) * 0.4f * (1f - t / d));
             winClip = MakeArpeggio("win", new[] { 523f, 659f, 784f, 1047f }, 0.12f);
             jackpotClip = MakeArpeggio("jackpot", new[] { 523f, 659f, 784f, 1047f, 1319f, 1568f, 2093f, 1568f, 2093f, 2637f }, 0.13f);
+            feverClip = MakeArpeggio("fever", new[] { 659f, 880f, 1175f, 1568f, 2093f }, 0.16f);
 
             LoadClip("tick", c => tickClip = c);
             LoadClip("stop", c => stopClip = c);

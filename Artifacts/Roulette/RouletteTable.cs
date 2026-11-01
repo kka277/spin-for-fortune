@@ -40,23 +40,27 @@ namespace SpinForFortune
         public const float ReachSlowTime = 2.8f;
 
         // 抽選確率(%)。残りがハズレ。
-        public const float JackpotPercent = 1.5f;
-        public const float BigPercent = 4.5f;
-        public const float MidPercent = 9f;
-        public const float SmallPercent = 15f;
+        public const float JackpotPercent = 2f;
+        public const float BigPercent = 6f;
+        public const float MidPercent = 12f;
+        public const float SmallPercent = 30f;
         // ハズレのうちリーチになる割合(全体に対する%)。
         public const float ReachMissPercent = 15f;
 
         public const int SmallMoney = 50;
-        public const int MidBuffDamageBonus = 30;
-        public const float MidBuffSeconds = 10f;
+        public const float SmallAttackMultiplier = 0.5f;
+        public const int MidBuffDamageBonus = 50;
+        public const float MidBuffSeconds = 15f;
+        public const float MidAttackMultiplier = 1f;
         public const float BigHealPercent = 25f;
+        public const float BigAttackMultiplier = 1.5f;
         public const float BigDamageRadius = 14f;
         public const float BigBaseDamage = 100f;
         public const int JackpotMoney = 500;
         public const float JackpotInvincibleSeconds = 20f;
-        public const int JackpotBuffDamageBonus = 50;
-        public const float JackpotBuffSeconds = 20f;
+        public const int JackpotBuffDamageBonus = 75;
+        public const float JackpotBuffSeconds = 25f;
+        public const float JackpotAttackMultiplier = 3f;
 
         // 0..3 は当たり図柄(Small/Mid/Big/Jackpot)、4..5 はハズレ専用の図柄。
         public static readonly string[] SymbolNames = { "CHERRY", "BELL", "BAR", "7", "LEMON", "PLUM" };

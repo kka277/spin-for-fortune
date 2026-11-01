@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <!--
     ・ｸ嵓ｼ・ｬ・・DLL ・ｨ・・・懍梠・ｩ 嵓・｡懍晨敢. 嵓誤溢擽・ｴ ・､尞ｰ ・・・ｼ・ｬ 嵓ｼ﨑ｴ +5.
     1. GameDir・ｼ ・護桷 ・､・・尞ｴ・罷｡・・緋ｾｸ・ｰ・・ ・誤糖﨑 ・・-p:GameDir="..." ・・・俾ｹ・笈・､.
@@ -33,6 +33,8 @@
     <Compile Include="Artifacts\Roulette\Buffs\RouletteBuffs.cs" />
     <Compile Include="Artifacts\Roulette\Buffs\RouletteBuffHUD.cs" />
     <Compile Include="Artifacts\Roulette\UI\RouletteInvulnerabilityUI.cs" />
+    <Compile Include="Artifacts\Roulette\UI\RouletteDamageEffects.cs" />
+    <Compile Include="Artifacts\Roulette\UI\RouletteFeverFrameUI.cs" />
     <Compile Include="Artifacts\Roulette\RouletteArtifact.cs" />
     <Compile Include="Artifacts\Roulette\RouletteUI.cs" />
     <Compile Include="Artifacts\Roulette\Audio\RouletteAudio.cs" />
@@ -70,6 +72,7 @@
     <Reference Include="UnityEngine.UIModule"><HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="FMODUnity"><HintPath>$(GameDir)\Sephiria_Data\Managed\FMODUnity.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(GameDir)\Sephiria_Data\Managed\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
     <!--
     﨑・囈﨑 ・・・呷捩 ・ｩ・晧愍・・・緋ｰ:
     <Reference Include="UnityEngine.UI"><HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
@@ -80,14 +83,19 @@
   <!--
     ・誤糖 弡・
     1. ・誤糖・・DLL・・package/bin/ ・尖巡 ・ｵ・ｬ﨑ｴ package/ 尞ｴ・罷ｧ護愍・・・・┳・・・ｨ・懋ｰ ・俾ｲ・﨑罹共(・誤糖 ・・擽 WorkshopLocal・・・ｵ・ｬ﨑ｴ ・ｸ ・・・溢搆).
-    2. package/ ・溢攪 ・ｨ・ 甯護攵(metadata.json, thumbnail.png, bin/*.dll)・・・ｨ・・尞ｴ・罷｡・・ｵ・ｬ﨑罹共.
+    2. package/ ・溢攪 ・ｨ・ 甯護攵(metadata.json, thumbnail.png, bin/, Localization/, images/, sounds/)・・・ｨ・・尞ｴ・罷｡・・ｵ・ｬ﨑罹共.
   -->
   <Target Name="CopyPackageFiles" AfterTargets="Build">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="package\bin\" />
     <ItemGroup>
-      <RouletteImages Include="images\roulette\**\*" />
+      <LocalizationFiles Include="Localization\**\*" />
+      <ModImages Include="images\**\*" />
+      <ModSounds Include="sounds\**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(RouletteImages)" DestinationFiles="@(RouletteImages->'package\images\roulette\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="metadata.json;thumbnail.png" DestinationFolder="package\" />
+    <Copy SourceFiles="@(LocalizationFiles)" DestinationFiles="@(LocalizationFiles->'package\Localization\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(ModImages)" DestinationFiles="@(ModImages->'package\images\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(ModSounds)" DestinationFiles="@(ModSounds->'package\sounds\%(RecursiveDir)%(Filename)%(Extension)')" />
     <ItemGroup>
       <PackageFiles Include="package\**\*" />
     </ItemGroup>

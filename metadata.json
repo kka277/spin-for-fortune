@@ -6,7 +6,7 @@
   "mod": {
     "schemaVersion": 1,
     "modId": "kka.spin-for-fortune",
-    "version": "0.0.6",
+    "version": "0.1.2",
     "author": "kka",
     "multiplayer": { "installation": "everyone" },
     "modules": [

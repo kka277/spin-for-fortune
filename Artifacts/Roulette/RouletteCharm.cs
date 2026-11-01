@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using UnityEngine;
 
 namespace SpinForFortune
@@ -8,7 +10,9 @@ namespace SpinForFortune
     public class RouletteCharm : Charm_Basic
     {
         private const string SpinMessagePrefix = "SpinForFortune:roulette-start:";
+        private const string DamageImpactMessagePrefix = "SpinForFortune:roulette-hit:";
         private const int MaxFreeSpins = 3;
+        private const int MaxDamageImpactEffects = 16;
         private const float FreeSpinDelay = 3f;
         private readonly System.Random rng = new System.Random();
         private RouletteSpin pending;
@@ -42,7 +46,6 @@ namespace SpinForFortune
         protected override void OnUpdate()
         {
             base.OnUpdate();
-            RouletteProgression.ResetOnDeath(NetworkAvatar);
             if (NetworkAvatar == null || NetworkAvatar.IsDead)
             {
                 pending = null;
@@ -53,7 +56,6 @@ namespace SpinForFortune
             }
 
             float dt = Time.deltaTime;
-            RouletteProgression.Tick(NetworkAvatar, dt);
             if (cooldown > 0f)
                 cooldown -= dt;
 
@@ -65,6 +67,12 @@ namespace SpinForFortune
             }
             else if (freeChainActive)
             {
+                if (!RouletteProgression.IsComboActive(NetworkAvatar))
+                {
+                    FinishFreeChain(pendingParams);
+                    return;
+                }
+
                 freeSpinDelay -= dt;
                 if (freeSpinDelay <= 0f)
                 {
@@ -91,6 +99,9 @@ namespace SpinForFortune
                 return;
 
             var parameters = RouletteModifierCharm.Collect(NetworkAvatar);
+            float luck = Mathf.Max(0, NetworkAvatar.GetCustomStat(ECustomStat.Luck)) +
+                RouletteProgression.GetStreakLuckBonus(NetworkAvatar);
+            parameters.winChanceMultiplier *= 1f + luck / 100f;
             int gamblingPieces = NetworkAvatar.Inventory == null
                 ? 0
                 : NetworkAvatar.Inventory.GetSetEffectCount(RouletteArtifact.GamblingCategoryId);
@@ -118,6 +129,8 @@ namespace SpinForFortune
         internal static void HandleClientMessage(string message)
         {
             if (RouletteProgression.HandleClientMessage(message))
+                return;
+            if (HandleDamageImpactMessage(message))
                 return;
             if (message == null || !message.StartsWith(SpinMessagePrefix, StringComparison.Ordinal))
                 return;
@@ -202,6 +215,7 @@ namespace SpinForFortune
             {
                 case RouletteTier.Small:
                     NetworkAvatar.AddMoney(Scale(RouletteTable.SmallMoney, reward));
+                    DamageNearbyEnemies(reward, RouletteTable.SmallAttackMultiplier, "roulette-small", RouletteTier.Small);
                     break;
                 case RouletteTier.Mid:
                 {
@@ -210,11 +224,12 @@ namespace SpinForFortune
                         Debug.LogError("[SpinForFortune] 中当たりの攻撃力バフを付与できませんでした。");
                     else
                         midBuff.BuffDuration *= parameters.buffDurationMultiplier;
+                    DamageNearbyEnemies(reward, RouletteTable.MidAttackMultiplier, "roulette-mid", RouletteTier.Mid);
                     break;
                 }
                 case RouletteTier.Big:
                     NetworkAvatar.HealPercent(RouletteTable.BigHealPercent * reward);
-                    DamageNearbyEnemies(reward);
+                    DamageNearbyEnemies(reward, RouletteTable.BigAttackMultiplier, "roulette-big", RouletteTier.Big);
                     break;
                 case RouletteTier.Jackpot:
                 {
@@ -230,11 +245,13 @@ namespace SpinForFortune
                         Debug.LogError("[SpinForFortune] ジャックポットの攻撃力バフを付与できませんでした。");
                     else
                         jackpotBuff.BuffDuration *= parameters.buffDurationMultiplier;
+                    DamageNearbyEnemies(reward, RouletteTable.JackpotAttackMultiplier, "roulette-jackpot", RouletteTier.Jackpot);
                     break;
                 }
             }
 
-            if (allowFreeChain && spin.tier >= RouletteTier.Mid && freeSpinsIssued < MaxFreeSpins)
+            if (allowFreeChain && RouletteProgression.IsComboActive(NetworkAvatar) &&
+                spin.tier >= RouletteTier.Mid && freeSpinsIssued < MaxFreeSpins)
             {
                 freeChainActive = true;
                 freeSpinDelay = FreeSpinDelay;
@@ -254,11 +271,88 @@ namespace SpinForFortune
 
         private static int Scale(int value, float multiplier) => Mathf.RoundToInt(value * multiplier);
 
-        private void DamageNearbyEnemies(float rewardMultiplier)
+        private static bool HandleDamageImpactMessage(string message)
         {
-            float damage = (RouletteTable.BigBaseDamage + NetworkAvatar.GetCustomStat(ECustomStat.PhysicalDamage) * 5f) * rewardMultiplier;
+            if (message == null || !message.StartsWith(DamageImpactMessagePrefix, StringComparison.Ordinal))
+                return false;
+
+            var values = message.Substring(DamageImpactMessagePrefix.Length).Split('|');
+            if (values.Length < 4 || (values.Length - 1) % 3 != 0 ||
+                !int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int tierValue) ||
+                tierValue < (int)RouletteTier.Small || tierValue > (int)RouletteTier.Jackpot ||
+                (values.Length - 1) / 3 > MaxDamageImpactEffects)
+            {
+                Debug.LogWarning("[SpinForFortune] ルーレットのダメージ演出メッセージの形式が不正です。");
+                return true;
+            }
+
+            for (int i = 1; i < values.Length; i += 3)
+            {
+                if (!TryParsePosition(values, i, out var position))
+                {
+                    Debug.LogWarning("[SpinForFortune] ルーレットのダメージ演出位置が不正です。");
+                    return true;
+                }
+
+                RouletteDamageEffects.ShowImpact(position, (RouletteTier)tierValue);
+            }
+            return true;
+        }
+
+        private static bool TryParsePosition(string[] values, int startIndex, out Vector3 position)
+        {
+            position = Vector3.zero;
+            if (!TryParseCoordinate(values[startIndex], out float x) ||
+                !TryParseCoordinate(values[startIndex + 1], out float y) ||
+                !TryParseCoordinate(values[startIndex + 2], out float z))
+                return false;
+
+            position = new Vector3(x, y, z);
+            return true;
+        }
+
+        private static bool TryParseCoordinate(string value, out float coordinate)
+        {
+            return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out coordinate) &&
+                !float.IsNaN(coordinate) && !float.IsInfinity(coordinate);
+        }
+
+        private void SendDamageImpactEffects(RouletteTier tier, List<Vector3> positions)
+        {
+            if (positions.Count == 0)
+                return;
+
+            if (NetworkAvatar.isLocalPlayer)
+            {
+                foreach (var position in positions)
+                    RouletteDamageEffects.ShowImpact(position, tier);
+                return;
+            }
+
+            if (NetworkAvatar.connectionToClient == null)
+            {
+                Debug.LogWarning("[SpinForFortune] ルーレットのダメージ演出を送信できません。所有者の接続がありません。");
+                return;
+            }
+
+            var message = new StringBuilder(DamageImpactMessagePrefix);
+            message.Append(((int)tier).ToString(CultureInfo.InvariantCulture));
+            foreach (var position in positions)
+            {
+                message.Append('|').Append(position.x.ToString("R", CultureInfo.InvariantCulture));
+                message.Append('|').Append(position.y.ToString("R", CultureInfo.InvariantCulture));
+                message.Append('|').Append(position.z.ToString("R", CultureInfo.InvariantCulture));
+            }
+            NetworkAvatar.TargetSendCustomMessage(NetworkAvatar.connectionToClient, message.ToString());
+        }
+
+        private void DamageNearbyEnemies(float rewardMultiplier, float attackMultiplier, string damageSource, RouletteTier tier)
+        {
+            float highestDamage = NetworkAvatar.GetStatWithFormula("HIGHEST", out EDamageElementalType elementalType);
+            float damage = highestDamage * 4f * rewardMultiplier * attackMultiplier;
             Vector3 origin = NetworkAvatar.transform.position;
             long hostile = NetworkAvatar.GetHostileFactionLayers(EDamageFromType.None);
+            var impactPositions = new List<Vector3>();
             foreach (var unit in FindObjectsByType<UnitAvatar>(FindObjectsSortMode.None))
             {
                 if (unit == null || unit == NetworkAvatar || unit.IsDead)
@@ -266,11 +360,15 @@ namespace SpinForFortune
                 if ((unit.transform.position - origin).sqrMagnitude > RouletteTable.BigDamageRadius * RouletteTable.BigDamageRadius)
                     continue;
 
-                var instance = DamageInstance.GetDamage(NetworkAvatar, "roulette-big", unit.transform.position, hostile, damage,
+                Vector3 impactPosition = unit.transform.position;
+                var instance = DamageInstance.GetDamage(NetworkAvatar, damageSource, impactPosition, hostile, damage,
                     EDamageType.Projectile, EDamageFromType.None, Vector2.zero, 1, 1f);
-                instance.elementalType = EDamageElementalType.Physical;
-                unit.ApplyDamage(instance);
+                instance.elementalType = elementalType;
+                var result = unit.ApplyDamage(instance);
+                if (result == EApplyDamageResult.Success && impactPositions.Count < MaxDamageImpactEffects)
+                    impactPositions.Add(impactPosition);
             }
+            SendDamageImpactEffects(tier, impactPositions);
         }
 
         public override bool Weaved()

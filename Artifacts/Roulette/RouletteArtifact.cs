@@ -9,13 +9,22 @@ namespace SpinForFortune
         private const int TemplateItemId = 1064;
         private static GameObject prefabHolder;
         private static readonly List<KeyValuePair<string, GameObject>> pendingPrefabs = new List<KeyValuePair<string, GameObject>>();
+        private static readonly System.Random grantSeedRandom = new System.Random();
+        private static readonly System.Reflection.FieldInfo ItemCategoriesField = typeof(ItemDatabase).GetField(
+            "itemCategories",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
         private static string modId;
         private static GameObject gamblingComboPrefab;
 
         public static RouletteDamageBuff MidDamageBuff { get; private set; }
         public static RouletteDamageBuff JackpotDamageBuff { get; private set; }
         public static RouletteInvulnerabilityBuff InvulnerabilityBuff { get; private set; }
+        internal static RouletteProgressBuff HeatProgressBuff { get; private set; }
+        internal static RouletteProgressBuff StreakProgressBuff { get; private set; }
+        internal static RouletteProgressBuff FeverProgressBuff { get; private set; }
         internal static string ModId => modId;
+        internal const string HeatDetailKeyword = "SpinForFortune_Roulette_Heat";
+        internal const string StreakDetailKeyword = "SpinForFortune_Roulette_Streak";
 
         // 登録するアーティファクトの定義。強化アーティファクトを足すときは、ここに1件足す。
         private class Definition
@@ -51,7 +60,24 @@ namespace SpinForFortune
             MidDamageBuff = CreateDamageBuff("mid", RouletteTable.MidBuffDamageBonus, RouletteTable.MidBuffSeconds);
             JackpotDamageBuff = CreateDamageBuff("jackpot", RouletteTable.JackpotBuffDamageBonus, RouletteTable.JackpotBuffSeconds);
             InvulnerabilityBuff = CreateInvulnerabilityBuff(RouletteTable.JackpotInvincibleSeconds);
+            HeatProgressBuff = CreateProgressBuff("heat");
+            StreakProgressBuff = CreateProgressBuff("streak");
+            FeverProgressBuff = CreateProgressBuff("fever");
             RouletteBuffHUD.Ensure();
+        }
+
+        private static RouletteProgressBuff CreateProgressBuff(string suffix)
+        {
+            string key = $"{modId}:roulette-progress-{suffix}-buff";
+            var prefab = new GameObject(key);
+            prefab.transform.SetParent(GetPrefabHolder().transform, false);
+            prefab.AddComponent<Mirror.NetworkIdentity>();
+            var buff = prefab.AddComponent<RouletteProgressBuff>();
+            buff.customID = suffix.ToUpperInvariant();
+            buff.defaultDuration = 1000000f;
+            buff.HUD_ID = RouletteBuffHUD.ProgressId(suffix);
+            pendingPrefabs.Add(new KeyValuePair<string, GameObject>(key, prefab));
+            return buff;
         }
 
         private static RouletteDamageBuff CreateDamageBuff(string suffix, int damageBonus, float duration)
@@ -149,11 +175,10 @@ namespace SpinForFortune
                 var all = ItemDatabase.GetAllItemCategory();
                 template = all.Length > 0 ? all[0] : null;
             }
-            var field = typeof(ItemDatabase).GetField("itemCategories", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            var dictionary = field?.GetValue(null) as Dictionary<string, ItemCategoryEntity>;
+            var dictionary = ItemCategoriesField?.GetValue(null) as Dictionary<string, ItemCategoryEntity>;
             if (template == null || dictionary == null)
             {
-                Debug.LogError($"[SpinForFortune] ギャンブルカテゴリーを登録できません。template={template != null} field={field != null} dict={dictionary != null}");
+                Debug.LogError($"[SpinForFortune] ギャンブルカテゴリーを登録できません。template={template != null} field={ItemCategoriesField != null} dict={dictionary != null}");
                 return CategoryTemplateId;
             }
 
@@ -186,6 +211,81 @@ namespace SpinForFortune
                 pendingPrefabs.Add(new KeyValuePair<string, GameObject>($"{modId}:{key}", gamblingComboPrefab));
             }
             category.comboEffectPrefab = gamblingComboPrefab;
+        }
+
+        internal static void RegisterComboInfoKeywords(string id)
+        {
+            modId = id;
+            if (!KeywordDatabase.IsInitialized())
+            {
+                Debug.LogError("[SpinForFortune] キーワードDB初期化前のため、ルーレット詳細キーワードを登録できません。");
+                return;
+            }
+
+            RegisterComboInfoKeyword(HeatDetailKeyword, "heat");
+            RegisterComboInfoKeyword(StreakDetailKeyword, "streak");
+        }
+
+        private static void RegisterComboInfoKeyword(string keywordId, string suffix)
+        {
+            if (KeywordDatabase.GetEntity(keywordId) != null)
+            {
+                Debug.LogError($"[SpinForFortune] コンボ詳細キーワードが既に登録されています: {keywordId}");
+                return;
+            }
+
+            var entity = ScriptableObject.CreateInstance<KeywordEntity>();
+            entity.name = $"{modId}:{suffix}-detail";
+            entity.keyword = keywordId;
+            entity.displayDetails = true;
+            entity.visualText = new LocalizedString($"{modId}:buff-progress-{suffix}-name");
+            entity.description = new LocalizedString($"{modId}:buff-progress-{suffix}-flavor");
+            KeywordDatabase.Register(entity);
+        }
+
+        internal static void GrantRouletteIfMissing(UnitAvatar owner)
+        {
+            if (!Mirror.NetworkServer.active)
+                return;
+            if (owner == null)
+            {
+                Debug.LogError("[SpinForFortune] ギャンブルコンボ発動時にプレイヤーを取得できません。ルーレットを獲得できません。");
+                return;
+            }
+            if (owner.Inventory == null)
+            {
+                Debug.LogError("[SpinForFortune] ギャンブルコンボ発動時にインベントリを取得できません。ルーレットを獲得できません。");
+                return;
+            }
+
+            var inventory = owner.Inventory;
+            var roulette = ItemDatabase.FindItemById(RouletteTable.ItemId);
+            if (roulette == null)
+            {
+                Debug.LogError("[SpinForFortune] ギャンブルコンボ発動時にルーレットを獲得できません。アイテムデータが見つかりません。");
+                return;
+            }
+
+            if (inventory.HasItem(roulette, out _, out _, out _) ||
+                inventory.TryGetSubBagItem(RouletteTable.ItemId, out _, out _))
+                return;
+
+            var additionResult = inventory.CanAddItem(roulette, 1);
+            if (additionResult != ItemAdditionCheckResult.Success &&
+                additionResult != ItemAdditionCheckResult.Success_Stack)
+            {
+                Debug.LogWarning($"[SpinForFortune] ギャンブルコンボ発動時にルーレットを獲得できません。インベントリに空きがありません ({additionResult})。");
+                return;
+            }
+
+            int seed;
+            lock (grantSeedRandom)
+                seed = grantSeedRandom.Next();
+            inventory.AddItemsWithGenerateInstanceID(
+                seed,
+                new[] { new ItemMetadata(0, roulette, 1) },
+                true,
+                true);
         }
 
         // 解放済みアーティファクトの一覧に追加する。サーバー側のPlayerSpawnerで呼ぶ。

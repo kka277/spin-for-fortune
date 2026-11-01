@@ -33,6 +33,7 @@ namespace SpinForFortune
             harmony.PatchAll(typeof(Entry).Assembly);
 
             HorayModAPI.OnLoadWeaponDatabase += HandleWeaponDatabaseLoaded;
+            HorayModAPI.OnLoadKeywordDatabase += HandleKeywordDatabaseLoaded;
             HorayModAPI.OnLoadItemDatabase += HandleItemDatabaseLoaded;
             HorayModAPI.OnAllDatabasesReady += TryRegisterBodies;
             HorayModAPI.OnTitleMenuReady += HandleTitleMenuReady;
@@ -47,10 +48,16 @@ namespace SpinForFortune
             RouletteArtifact.Register(Context.Definition.ModId);
         }
 
+        private void HandleKeywordDatabaseLoaded()
+        {
+            RouletteArtifact.RegisterComboInfoKeywords(Context.Definition.ModId);
+        }
+
         protected override void OnModUnloaded()
         {
             harmony?.UnpatchAll(harmony.Id);
             HorayModAPI.OnLoadWeaponDatabase -= HandleWeaponDatabaseLoaded;
+            HorayModAPI.OnLoadKeywordDatabase -= HandleKeywordDatabaseLoaded;
             HorayModAPI.OnLoadItemDatabase -= HandleItemDatabaseLoaded;
             HorayModAPI.OnAllDatabasesReady -= TryRegisterBodies;
             HorayModAPI.OnTitleMenuReady -= HandleTitleMenuReady;

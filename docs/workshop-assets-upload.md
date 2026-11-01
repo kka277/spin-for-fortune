@@ -3,7 +3,7 @@
 ## アップロード準備タスク
 
 VS Code の **ターミナル > タスクの実行 > Prepare Workshop upload and launch Sephiria** を実行する。
-Release ビルド後、`metadata.json` と `thumbnail.png`、および `metadata.json` の全モジュールのパスがMODフォルダにあることを確認し、Sephiriaを起動する。
+Release ビルド時に、DLL・`metadata.json`・`thumbnail.png`・`Localization/`・`images/`・`sounds/` を `package/` に集め、MODフォルダにもコピーする。ビルド後、`metadata.json` が宣言する全モジュールのパスが揃っていることを確認してからSephiriaを起動する。
 タスクはプロジェクトの `ModFolderName` を上書きせず、ワークスペースフォルダをMODフォルダとして検証する。ワークスペースを対象の `WorkshopLocal/<ModFolderName>/` から開いて実行する。
 
 タスクはゲーム内アップロードを自動実行しない。起動後、タイトル画面の **Steamワークショップ** パネルからMODを選び、**ワークショップにアップロード** を押す。アップロード後は `uploadticket.json` の `zipPath` が指すZIPを確認し、`images/` と `sounds/` が含まれていることを確認する。`uploadticket.json` は次回以降の更新に必要なので削除しない。

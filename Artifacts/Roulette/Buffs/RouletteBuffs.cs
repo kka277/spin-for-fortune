@@ -2,6 +2,36 @@ using UnityEngine;
 
 namespace SpinForFortune
 {
+    public class RouletteProgressBuff : CharacterBuff
+    {
+        private const string IdPrefix = "PHYSICALDAMAGEPLUS_ROULETTE_PROGRESS_";
+
+        public string customID;
+
+        public override string ID => IdPrefix + customID;
+
+        public void SetProgressStack(int value)
+        {
+            CurrentStack = value;
+        }
+
+        public override bool Weaved()
+        {
+            return true;
+        }
+
+        // フィーバーは残り時間をバフのタイマーに反映し、円形ゲージで確認できるようにする。
+        protected override void OnUpdate_Server()
+        {
+            if (customID == "FEVER" && NetworkTarget != null)
+            {
+                RouletteProgression.Tick(NetworkTarget, Time.deltaTime);
+                RouletteProgression.SyncFeverBuff(NetworkTarget, this);
+            }
+            base.OnUpdate_Server();
+        }
+    }
+
     // ルーレットの報酬として付与するバフ。
     public class RouletteDamageBuff : CharacterBuff
     {

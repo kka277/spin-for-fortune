@@ -17,6 +17,7 @@ namespace SpinForFortune
             public string id;
             public string slug; // ローカライズキーの元になる名前
             public Color frameColor;
+            public bool showStackOneText;
         }
 
         private static readonly Definition[] Definitions =
@@ -24,6 +25,9 @@ namespace SpinForFortune
             new Definition { id = DamageId("mid"), slug = "damage-mid", frameColor = new Color(0.95f, 0.5f, 0.15f) },
             new Definition { id = DamageId("jackpot"), slug = "damage-jackpot", frameColor = new Color(1f, 0.82f, 0.2f) },
             new Definition { id = InvulnerabilityId, slug = "invulnerable", frameColor = new Color(0.55f, 0.8f, 1f) },
+            new Definition { id = ProgressId("heat"), slug = "progress-heat", frameColor = new Color(1f, 0.38f, 0.12f), showStackOneText = true },
+            new Definition { id = ProgressId("streak"), slug = "progress-streak", frameColor = new Color(0.95f, 0.72f, 0.2f), showStackOneText = true },
+            new Definition { id = ProgressId("fever"), slug = "progress-fever", frameColor = new Color(1f, 0.88f, 0.32f) },
         };
 
         private static readonly Dictionary<string, EffectHUDEntity> entities = new Dictionary<string, EffectHUDEntity>();
@@ -31,6 +35,11 @@ namespace SpinForFortune
         public static string DamageId(string suffix)
         {
             return IdPrefix + "DAMAGE_" + suffix.ToUpperInvariant();
+        }
+
+        public static string ProgressId(string suffix)
+        {
+            return IdPrefix + "PROGRESS_" + suffix.ToUpperInvariant();
         }
 
         [HarmonyLib.HarmonyPostfix]
@@ -104,10 +113,66 @@ namespace SpinForFortune
             var hud = root.GetComponent<UI_BuffHUD>();
             hud.buffFillImage = fill;
             hud.whiteOverlayImage = overlay;
+            hud.stackText = CreateStackText(root.transform);
+            hud.showStackOneText = definition.showStackOneText;
             hud.effectType = UI_EffectHUD_Basic.EEffectType.Boon;
             hud.effectName = new LocalizedString($"{modId}:buff-{definition.slug}-name");
             hud.effectFlavorText = new LocalizedString($"{modId}:buff-{definition.slug}-flavor");
             return root;
+        }
+
+        // バニラのバフHUDのスタック数テキストを探し、見た目をそのまま流用する。
+        private static TMPro.TextMeshProUGUI FindVanillaStackText()
+        {
+            var field = typeof(EffectHUDDatabase).GetField("effectHUDDictionary", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            var dictionary = field?.GetValue(null) as Dictionary<string, EffectHUDEntity>;
+            if (dictionary == null)
+                return null;
+
+            foreach (var pair in dictionary)
+            {
+                if (pair.Key.StartsWith(IdPrefix) || pair.Value == null || pair.Value.hudPrefab == null)
+                    continue;
+                var hud = pair.Value.hudPrefab.GetComponent<UI_BuffHUD>();
+                if (hud != null && hud.stackText != null)
+                    return hud.stackText;
+            }
+            return null;
+        }
+
+        // バニラが見つからない場合のみ、独自にTMPテキストを作る。
+        private static TMPro.TextMeshProUGUI CreateStackText(Transform parent)
+        {
+            var vanilla = FindVanillaStackText();
+            if (vanilla != null)
+            {
+                var clone = Object.Instantiate(vanilla.gameObject, parent, false);
+                clone.name = "StackText";
+                var cloned = clone.GetComponent<TMPro.TextMeshProUGUI>();
+                cloned.text = "";
+                return cloned;
+            }
+
+            var go = new GameObject("StackText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TMPro.TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = new Vector2(1f, 0f);
+
+            var text = go.GetComponent<TMPro.TextMeshProUGUI>();
+            var fonts = Resources.FindObjectsOfTypeAll<TMPro.TMP_FontAsset>();
+            if (fonts.Length > 0)
+                text.font = fonts[0];
+            text.fontSize = 8f;
+            text.fontStyle = TMPro.FontStyles.Bold;
+            text.alignment = TMPro.TextAlignmentOptions.BottomRight;
+            text.color = Color.white;
+            text.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+            text.raycastTarget = false;
+            text.text = "";
+            return text;
         }
 
         private static Image CreateChild(Transform parent, string childName, float inset)

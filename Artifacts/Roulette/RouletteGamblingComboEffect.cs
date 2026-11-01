@@ -6,30 +6,48 @@ namespace SpinForFortune
 {
     public class RouletteGamblingComboEffect : ComboEffectBase
     {
+        public override EComboEnableResult Enable(int comboCount, out int appliedComboEffectCount)
+        {
+            var result = base.Enable(comboCount, out appliedComboEffectCount);
+            if (isEnabled)
+            {
+                RouletteProgression.EnableCombo(avatar);
+                RouletteArtifact.GrantRouletteIfMissing(avatar);
+            }
+            return result;
+        }
+
+        protected override void OnDisableEffect()
+        {
+            base.OnDisableEffect();
+            RouletteProgression.DisableCombo(avatar);
+        }
+
+        private void Update()
+        {
+            if (!Mirror.NetworkServer.active || !isEnabled)
+                return;
+
+            RouletteProgression.ResetOnDeath(avatar);
+            RouletteProgression.Tick(avatar, UnityEngine.Time.deltaTime);
+        }
+
         protected override void OnRequestComboData(UnitAvatar avatar, List<ComboEffectElement> elements)
         {
             if (avatar == null)
                 return;
 
-            var snapshot = RouletteProgression.GetDisplaySnapshot(avatar);
-
             string key = $"{RouletteArtifact.ModId}:roulette-gambling-combo-2";
             string format = new LocalizedString(key).ToString();
+            string effectName = string.Format(
+                CultureInfo.InvariantCulture,
+                format,
+                RouletteProgression.RewardBonusAtTwoPieces,
+                RouletteProgression.RewardBonusAtTwoPieces);
             elements.Add(new ComboEffectElement
             {
                 comboCount = 2,
-                effectName = string.Format(
-                    CultureInfo.InvariantCulture,
-                    format,
-                    RouletteProgression.RewardBonusAtTwoPieces,
-                    RouletteProgression.RewardBonusAtTwoPieces,
-                    snapshot.SmallWins,
-                    snapshot.MidWins,
-                    snapshot.BigWins,
-                    snapshot.JackpotWins,
-                    snapshot.Heat,
-                    snapshot.Streak,
-                    snapshot.FeverSeconds)
+                effectName = $"{effectName}\n<tag={RouletteArtifact.HeatDetailKeyword}>\n<tag={RouletteArtifact.StreakDetailKeyword}>"
             });
 
             key = $"{RouletteArtifact.ModId}:roulette-gambling-combo-4";
@@ -83,8 +101,21 @@ namespace SpinForFortune
         {
             public readonly HashSet<RouletteCharm> ActiveCharms = new HashSet<RouletteCharm>();
             public RouletteProgressSnapshot Snapshot;
+            public bool ComboActive;
             public bool ResetForDeath;
             public int LastTickFrame = -1;
+            public float DisabledAt = -1f;
+        }
+
+        // 装備変更などで効果が一瞬だけ無効→有効に切り替わっても進行を保持する猶予時間。
+        private const float DisableGraceSeconds = 2f;
+
+        private static void RestoreOrResetAfterDisable(ProgressState state)
+        {
+            if (state.DisabledAt >= 0f &&
+                UnityEngine.Time.unscaledTime - state.DisabledAt > DisableGraceSeconds)
+                state.Snapshot = new RouletteProgressSnapshot();
+            state.DisabledAt = -1f;
         }
 
         internal const int RewardBonusAtTwoPieces = 20;
@@ -94,6 +125,7 @@ namespace SpinForFortune
         internal const float FeverDuration = 10f;
         internal const float MaxFeverDuration = 15f;
         internal const float FeverRewardMultiplier = 1.5f;
+        internal const int LuckPerStreak = 5;
 
         internal static float GetRewardMultiplier(int pieces)
         {
@@ -105,6 +137,22 @@ namespace SpinForFortune
                         ? RewardBonusAtTwoPieces
                         : 0;
             return 1f + bonusPercent / 100f;
+        }
+
+        internal static void EnableCombo(UnitAvatar owner)
+        {
+            if (owner == null)
+                return;
+
+            if (!States.TryGetValue(owner, out var state))
+            {
+                state = new ProgressState();
+                States.Add(owner, state);
+            }
+            state.ComboActive = true;
+            state.ResetForDeath = false;
+            RestoreOrResetAfterDisable(state);
+            Publish(owner, state.Snapshot, true);
         }
 
         internal static void RegisterCharm(RouletteCharm charm, UnitAvatar owner)
@@ -119,7 +167,8 @@ namespace SpinForFortune
             }
             state.ActiveCharms.Add(charm);
             state.ResetForDeath = false;
-            Publish(owner, state.Snapshot, true);
+            RestoreOrResetAfterDisable(state);
+            Publish(owner, state.Snapshot, state.ComboActive);
         }
 
         internal static void UnregisterCharm(RouletteCharm charm, UnitAvatar owner)
@@ -129,9 +178,29 @@ namespace SpinForFortune
 
             state.ActiveCharms.Remove(charm);
             if (state.ActiveCharms.Count == 0)
-                Reset(owner, state, true);
+            {
+                state.DisabledAt = UnityEngine.Time.unscaledTime;
+                Publish(owner, state.Snapshot, false);
+            }
             else
-                Publish(owner, state.Snapshot, true);
+                Publish(owner, state.Snapshot, state.ComboActive);
+        }
+
+        internal static void DisableCombo(UnitAvatar owner)
+        {
+            if (owner == null || !States.TryGetValue(owner, out var state))
+                return;
+
+            state.ComboActive = false;
+            state.DisabledAt = UnityEngine.Time.unscaledTime;
+            Publish(owner, state.Snapshot, false);
+        }
+
+        internal static bool IsComboActive(UnitAvatar owner)
+        {
+            return owner != null &&
+                States.TryGetValue(owner, out var state) &&
+                state.ComboActive;
         }
 
         internal static void ResetOnDeath(UnitAvatar owner)
@@ -155,6 +224,7 @@ namespace SpinForFortune
         internal static void Tick(UnitAvatar owner, float deltaTime)
         {
             if (owner == null || !States.TryGetValue(owner, out var state) ||
+                !state.ComboActive ||
                 state.LastTickFrame == UnityEngine.Time.frameCount)
                 return;
 
@@ -164,7 +234,15 @@ namespace SpinForFortune
 
             state.Snapshot.FeverSeconds = Math.Max(0f, state.Snapshot.FeverSeconds - deltaTime);
             if (state.Snapshot.FeverSeconds <= 0f)
-                Publish(owner, state.Snapshot, state.ActiveCharms.Count > 0);
+                Publish(owner, state.Snapshot, state.ComboActive);
+            else if (owner.isServer)
+                SyncFeverBuff(owner, owner.GetBuffInstanceByPrefab(RouletteArtifact.FeverProgressBuff) as RouletteProgressBuff);
+        }
+
+        internal static void SyncFeverBuff(UnitAvatar owner, RouletteProgressBuff buff)
+        {
+            if (buff != null && States.TryGetValue(owner, out var state) && state.Snapshot.FeverSeconds > 0f)
+                SyncFeverTimer(buff, state.Snapshot.FeverSeconds);
         }
 
         internal static float GetFeverSeconds(UnitAvatar owner)
@@ -174,15 +252,24 @@ namespace SpinForFortune
                 : 0f;
         }
 
+        internal static float GetStreakLuckBonus(UnitAvatar owner)
+        {
+            return owner != null &&
+                States.TryGetValue(owner, out var state) &&
+                state.ComboActive
+                    ? state.Snapshot.Streak * LuckPerStreak
+                    : 0f;
+        }
+
         internal static void RecordOutcome(UnitAvatar owner, RouletteTier tier, bool reach)
         {
-            if (owner == null || !States.TryGetValue(owner, out var state))
+            if (owner == null || !States.TryGetValue(owner, out var state) ||
+                !state.ComboActive)
                 return;
 
             if (tier == RouletteTier.Miss)
             {
                 state.Snapshot.Streak = 0;
-                state.Snapshot.Heat = Math.Max(0, state.Snapshot.Heat - (reach ? 1 : 2));
             }
             else
             {
@@ -191,20 +278,14 @@ namespace SpinForFortune
                 int streakBonus = Math.Min(2, Math.Max(0, state.Snapshot.Streak - 1) / 2);
                 state.Snapshot.Heat = Math.Min(MaxHeat, state.Snapshot.Heat + baseHeat + streakBonus);
 
-                int pieces = owner.Inventory == null
-                    ? 0
-                    : owner.Inventory.GetSetEffectCount(RouletteArtifact.GamblingCategoryId);
-                if (pieces >= 2)
-                {
-                    if (tier == RouletteTier.Small)
-                        state.Snapshot.SmallWins = Increment(state.Snapshot.SmallWins);
-                    else if (tier == RouletteTier.Mid)
-                        state.Snapshot.MidWins = Increment(state.Snapshot.MidWins);
-                    else if (tier == RouletteTier.Big)
-                        state.Snapshot.BigWins = Increment(state.Snapshot.BigWins);
-                    else if (tier == RouletteTier.Jackpot)
-                        state.Snapshot.JackpotWins = Increment(state.Snapshot.JackpotWins);
-                }
+                if (tier == RouletteTier.Small)
+                    state.Snapshot.SmallWins = Increment(state.Snapshot.SmallWins);
+                else if (tier == RouletteTier.Mid)
+                    state.Snapshot.MidWins = Increment(state.Snapshot.MidWins);
+                else if (tier == RouletteTier.Big)
+                    state.Snapshot.BigWins = Increment(state.Snapshot.BigWins);
+                else if (tier == RouletteTier.Jackpot)
+                    state.Snapshot.JackpotWins = Increment(state.Snapshot.JackpotWins);
 
                 if (state.Snapshot.Heat >= MaxHeat)
                 {
@@ -216,7 +297,7 @@ namespace SpinForFortune
             }
 
             state.ResetForDeath = false;
-            Publish(owner, state.Snapshot, state.ActiveCharms.Count > 0);
+            Publish(owner, state.Snapshot, state.ComboActive);
         }
 
         private static int HeatForTier(RouletteTier tier)
@@ -244,7 +325,7 @@ namespace SpinForFortune
         {
             clientSnapshot = new RouletteProgressSnapshot();
             hasClientSnapshot = true;
-            RouletteUI.SetProgression(0, 0, 0f, false);
+            RouletteUI.SetFever(0f);
         }
 
         internal static bool HandleClientMessage(string message)
@@ -281,14 +362,14 @@ namespace SpinForFortune
                 FeverSeconds = feverSeconds
             };
             hasClientSnapshot = true;
-            RouletteUI.SetProgression(heat, streak, feverSeconds, values[7] == "1");
+            RouletteUI.SetFever(feverSeconds);
             return true;
         }
 
         private static void Reset(UnitAvatar owner, ProgressState state, bool removeState)
         {
             state.Snapshot = new RouletteProgressSnapshot();
-            Publish(owner, state.Snapshot, state.ActiveCharms.Count > 0);
+            Publish(owner, state.Snapshot, state.ComboActive);
             if (removeState)
                 States.Remove(owner);
         }
@@ -298,16 +379,76 @@ namespace SpinForFortune
             if (owner == null)
                 return;
 
+            if (owner.isServer)
+                UpdateProgressBuffs(owner, snapshot, active);
+
             if (owner.isLocalPlayer)
             {
                 clientSnapshot = snapshot;
                 hasClientSnapshot = true;
-                RouletteUI.SetProgression(snapshot.Heat, snapshot.Streak, snapshot.FeverSeconds, active);
+                RouletteUI.SetFever(snapshot.FeverSeconds);
                 return;
             }
 
             if (owner.connectionToClient != null)
                 owner.TargetSendCustomMessage(owner.connectionToClient, Serialize(snapshot, active));
+        }
+
+        private static void UpdateProgressBuffs(UnitAvatar owner, RouletteProgressSnapshot snapshot, bool active)
+        {
+            UpdateProgressBuff(owner, RouletteArtifact.HeatProgressBuff, snapshot.Heat, active);
+            UpdateProgressBuff(owner, RouletteArtifact.StreakProgressBuff, snapshot.Streak, active);
+            UpdateProgressBuff(owner, RouletteArtifact.FeverProgressBuff, 1, active && snapshot.FeverSeconds > 0f, snapshot.FeverSeconds);
+        }
+
+        private static void UpdateProgressBuff(
+            UnitAvatar owner,
+            RouletteProgressBuff prefab,
+            int stack,
+            bool active,
+            float duration = 1000000f)
+        {
+            if (prefab == null)
+            {
+                UnityEngine.Debug.LogError("[SpinForFortune] ルーレット進行バフのプレハブが登録されていません。");
+                return;
+            }
+
+            var buff = owner.GetBuffInstanceByPrefab(prefab) as RouletteProgressBuff;
+            if (!active || stack <= 0)
+            {
+                if (buff != null)
+                    owner.ForcedEndBuff(buff);
+                return;
+            }
+
+            if (buff == null)
+            {
+                buff = owner.ApplyBuff(prefab, 1f, owner);
+                if (buff == null)
+                {
+                    UnityEngine.Debug.LogError($"[SpinForFortune] ルーレット進行バフを付与できませんでした: {prefab.ID}");
+                    return;
+                }
+            }
+
+            buff.SetProgressStack(stack);
+            if (duration < 1000000f)
+                SyncFeverTimer(buff, duration);
+        }
+
+        private static readonly System.Reflection.FieldInfo BuffTimerField =
+            typeof(CharacterBuff).GetField("buffTimer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        // バフのタイマーは経過時間/全体時間で動くため、残り時間から経過割合を逆算して合わせる。
+        private static void SyncFeverTimer(RouletteProgressBuff buff, float remaining)
+        {
+            var timer = BuffTimerField?.GetValue(buff) as Timer;
+            if (timer == null)
+                return;
+
+            timer.time = MaxFeverDuration;
+            timer.Ratio = 1f - UnityEngine.Mathf.Clamp01(remaining / MaxFeverDuration);
         }
 
         private static string Serialize(RouletteProgressSnapshot snapshot, bool active)
