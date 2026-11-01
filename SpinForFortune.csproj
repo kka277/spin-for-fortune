@@ -1,0 +1,96 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ・ｸ嵓ｼ・ｬ・・DLL ・ｨ・・・懍梠・ｩ 嵓・｡懍晨敢. 嵓誤溢擽・ｴ ・､尞ｰ ・・・ｼ・ｬ 嵓ｼ﨑ｴ +5.
+    1. GameDir・ｼ ・護桷 ・､・・尞ｴ・罷｡・・緋ｾｸ・ｰ・・ ・誤糖﨑 ・・-p:GameDir="..." ・・・俾ｹ・笈・､.
+    2. AssemblyName / RootNamespace / ModFolderName・・・専ｸｰ ・ｨ・・・ｴ・・愍・・・緋ｿ雅笈・､.
+    3. package/metadata.json・・modId, path(bin/<AssemblyName>.dll), entryClass(<RootNamespace>.Entry)・ｼ ・呷捩 ・ｴ・・愍・・・樌ｶ･・壱共.
+    ・誤糖: dotnet build -c Release
+    ・罹･: <GameDir>/WorkshopLocal/<ModFolderName>/bin/<AssemblyName>.dll + package/ ・ｴ・ｩ ・ｵ・ｬ
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>SpinForFortune</AssemblyName>
+    <RootNamespace>SpinForFortune</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DebugType>portable</DebugType>
+
+    <GameDir Condition="'$(GameDir)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\Sephiria_Data\Managed\Assembly-CSharp.dll')">$(MSBuildThisFileDirectory)..\..</GameDir>
+    <GameDir Condition="'$(GameDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Sephiria</GameDir>
+    <ModFolderName>spin-for-fortune</ModFolderName>
+    <ModOutDir>$(GameDir)\WorkshopLocal\$(ModFolderName)\</ModOutDir>
+    <OutDir>$(ModOutDir)bin\</OutDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Entry.cs" />
+    <Compile Include="Artifacts\Roulette\RouletteTable.cs" />
+    <Compile Include="Artifacts\Roulette\RouletteCharm.cs" />
+    <Compile Include="Artifacts\Roulette\Buffs\RouletteBuffs.cs" />
+    <Compile Include="Artifacts\Roulette\Buffs\RouletteBuffHUD.cs" />
+    <Compile Include="Artifacts\Roulette\UI\RouletteInvulnerabilityUI.cs" />
+    <Compile Include="Artifacts\Roulette\RouletteArtifact.cs" />
+    <Compile Include="Artifacts\Roulette\RouletteUI.cs" />
+    <Compile Include="Artifacts\Roulette\Audio\RouletteAudio.cs" />
+    <Compile Include="Artifacts\Roulette\RouletteParams.cs" />
+    <Compile Include="Artifacts\Roulette\RouletteModifierCharm.cs" />
+    <Compile Include="Artifacts\Roulette\RouletteGamblingComboEffect.cs" />
+    <Compile Include="Artifacts\RouletteSpeedUp\RouletteSpeedUpCharm.cs" />
+  </ItemGroup>
+
+  <!-- ・護桷 DLL・ ・ｸ・ｰ・・﨑俾ｳ ・ｵ・ｬ﨑們ｧ ・喜慣・壱共(Private=false). ・ｵ・ｬ・俯ｩｴ ・呷捩 ・ｴ・壱ｸ罷ｦｬ・ ・・・・・罹糖・ｩ・壱共. -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameDir)\Sephiria_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- PlayerAvatar・ ・､孖ｸ・醐〓 ・､・護晨敢・ｼ Mirror ・ｸ・ｰ・ 﨑・囈﨑ｩ・壱共(isLocalPlayer ・ｱ). -->
+    <Reference Include="Mirror">
+      <HintPath>$(GameDir)\Sephiria_Data\Managed\Mirror.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameDir)\Sephiria_Data\Managed\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- 繝ｫ繝ｼ繝ｬ繝・ヨ縺ｮ貍泌・UI/蜉ｹ譫憺浹逕ｨ -->
+    <Reference Include="UnityEngine.UI"><HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="FMODUnity"><HintPath>$(GameDir)\Sephiria_Data\Managed\FMODUnity.dll</HintPath><Private>false</Private></Reference>
+    <!--
+    﨑・囈﨑 ・・・呷捩 ・ｩ・晧愍・・・緋ｰ:
+    <Reference Include="UnityEngine.UI"><HintPath>$(GameDir)\Sephiria_Data\Managed\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(GameDir)\Sephiria_Data\Managed\0Harmony.dll</HintPath><Private>false</Private></Reference>
+    -->
+  </ItemGroup>
+
+  <!--
+    ・誤糖 弡・
+    1. ・誤糖・・DLL・・package/bin/ ・尖巡 ・ｵ・ｬ﨑ｴ package/ 尞ｴ・罷ｧ護愍・・・・┳・・・ｨ・懋ｰ ・俾ｲ・﨑罹共(・誤糖 ・・擽 WorkshopLocal・・・ｵ・ｬ﨑ｴ ・ｸ ・・・溢搆).
+    2. package/ ・溢攪 ・ｨ・ 甯護攵(metadata.json, thumbnail.png, bin/*.dll)・・・ｨ・・尞ｴ・罷｡・・ｵ・ｬ﨑罹共.
+  -->
+  <Target Name="CopyPackageFiles" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="package\bin\" />
+    <ItemGroup>
+      <RouletteImages Include="images\roulette\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(RouletteImages)" DestinationFiles="@(RouletteImages->'package\images\roulette\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <ItemGroup>
+      <PackageFiles Include="package\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PackageFiles)" DestinationFiles="@(PackageFiles->'$(ModOutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+</Project>

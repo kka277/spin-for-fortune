@@ -1,0 +1,61 @@
+# アーティファクト「ルーレット」(伝説)
+
+> ここに記載するのは現行実装の仕様。連勝・熱狂・無料連鎖の詳細は [ルーレット「熱狂・連勝・連鎖」効果](./roulette-fever-chain-design.md)、カテゴリ報酬強化は [コンボとルーレット効果の設計案](./roulette-combo-design.md) を参照。
+
+## 仕様
+- 通常の敵に武器の直接攻撃(`EDamageFromType.DirectAttack`)が当たるたびに発動。カカシ(`Unit_Scarecrow`)と訓練用ダメージダミー(`DamageDummy`)への攻撃では発動しない。回転中・クールダウン(0.5秒)中は無視。
+- コスト: 30ゴールド。足りなければHP5(HPは1未満にならない。HPも足りなければ回さない)。
+- サーバーが当たり判定と報酬を処理し、確定した図柄・当たり結果を所有者へ送る。画面右下には3リールのスロット(`RouletteUI`)を表示し、画面中央のボスゲージなどと重ならないようにする。最初の2リールが揃うとリーチ(最後のリールがスロー回転、フラッシュ・枠の明滅・スロットUIパネルの揺れ・効果音)を表示する。演出と報酬結果は一致する。
+- ルーレットUI上部に熱狂ゲージ・連勝数・フィーバー残り時間を表示する。
+- ジャックポットの無敵中は、ローカルプレイヤーの画面外枠に虹色のグローと、縁に沿ってきらめく星の模様が出る。
+- 付与中のバフは、画面左上のバフ欄にアイコン付きで表示される(ツールチップあり)。
+- 抽選確率と報酬は [RouletteTable.cs](../Artifacts/Roulette/RouletteTable.cs) の定数で調整する。
+- 当たりで熱狂ゲージが増加し、10到達で10秒間フィーバー(ルーレット報酬+50%)。フィーバーの再発動は残り時間に10秒を加算し、最大15秒。発動したスピン自身には適用せず、ジャックポットの無敵時間にも適用しない。
+- 当たり連勝ごとにゲージ加算が増え、ハズレで連勝終了。通常ハズレはゲージ-2、ハズレリーチは-1。
+- 中当たり以上はコスト不要の無料スピンを発生させる。無料スピンからも連鎖し、有料スピン1回につき最大3回。無料スピンのハズレまたは小当たりで終了。連鎖中は他の攻撃による有料スピンを受け付けず、各結果の表示後に次の無料スピンを開始する。
+
+| 結果 | 確率 | 図柄 | 効果 |
+|---|---|---|---|
+| ジャックポット(伝説) | 1.5% | 7 | 500G、20秒無敵、20秒 全ダメージ+50% |
+| 大当たり(エピック) | 4.5% | BAR | HP25%回復、半径14の敵に 100+物理ダメージ×5 のダメージ |
+| 中当たり(レア) | 9% | BELL | 10秒 全ダメージ+30% |
+| 小当たり(コモン) | 15% | CHERRY | 50G |
+| ハズレ | 70% | - | うち全体の15%はハズレリーチ(2つ揃い) |
+
+## 強化アーティファクトの仕組み
+- 別アーティファクトで「ルーレット」の挙動を変えられる。調整値は [RouletteParams.cs](../Artifacts/Roulette/RouletteParams.cs) の倍率で、回転速度(`speed`)、消費金額/HP・クールダウンの倍率、当たり確率の倍率、報酬の倍率がある。
+- 強化アーティファクトは [RouletteModifierCharm.cs](../Artifacts/Roulette/RouletteModifierCharm.cs) を継承し、`Modify(RouletteParams)` で倍率を掛けるだけでよい。装備中のものは有効化時に静的リストへ登録され、`RouletteModifierCharm.Collect(owner)` が同じ持ち主の分を全部掛け合わせる。複数装備すると倍率は掛け算で重なる。
+- `RouletteCharm` は攻撃のたびに `Collect` で調整値を取り、消費・抽選・演出の速さ・報酬に反映する(`RouletteSpin.speed` 経由でUIの停止時刻も変わる)。
+- 新しい強化アーティファクトを足す手順: ①`RouletteModifierCharm` を継承したクラスを作る(IDを定数で持つ) ②`RouletteArtifact.Definitions` に1件足す(ID・名前の元になるslug・レア度・価格・クラス・アイコン名) ③`Localization/ja-JP.json` に `<slug>-name` / `-flavor` / `-effect` を足す ④csproj に `Compile Include` を足す ⑤`img_md/ルーレット/` にアイコンのプロンプトを足す。アイテムオブジェクト名は共通登録処理で `<ID>_<slug>` 形式にする。解放処理と プレハブ登録は `Definitions` を回すので追加不要。
+- 「高速ルーレット」は別ID (`2000000101`) の独立したアーティファクトなので、固有コードは [Artifacts/RouletteSpeedUp/](../Artifacts/RouletteSpeedUp/) に置く。共通の強化処理は [RouletteModifierCharm.cs](../Artifacts/Roulette/RouletteModifierCharm.cs) を使う。レア、回転速度1.5倍。アイコン: `images/roulette/speedup_icon.png` / `speedup_icon_world.png`。
+- 回転速度は、リール停止時刻・リーチのスロー時間・回転中の切替間隔をすべて `speed` で割る。
+- 範囲ダメージ・回復は `rewardMultiplier` で増える。
+- ギャンブルカテゴリ2/4/6個でルーレット報酬・バフ効果とバフ時間が+20/+40/+60%になる。段階は累積しない。ゴールド、回復、範囲ダメージ、一時ダメージバフの量・時間、ジャックポットの無敵時間が対象で、抽選確率・コスト・熱狂/連勝/フィーバー・無料スピン連鎖は変わらない。結果別の当たり回数はカテゴリのコンボ効果欄に表示する。死亡またはルーレットをすべて失うと当たり回数と連勝・熱狂・フィーバーをリセットする。詳細は [コンボとルーレット効果の設計案](./roulette-combo-design.md) を参照。
+
+## 実装メモ(調査結果)
+- ソースはアーティファクトごとに `Artifacts/<アーティファクト名>/` にまとめる。UI・バフ・音声なども、そのアーティファクトのフォルダ直下に配置する。
+- UIは小型化済み(パネル 300x125、画面右下、右端から190px・下端から60px)。スロットUI本体だけを右端から離して配置し、上部の進行状況表示位置は変更しない。位置とサイズは `RouletteUI.Build` の `panel` 設定で調整できる。
+- レトロなスロット筐体風のUI背景画像の生成指示書は、既存の図柄・アイコン指示書とは分けて [背景画像生成プロンプト.md](../img_md/ルーレット_UI背景/背景画像生成プロンプト.md) に置く。生成画像は `images/roulette/ui_background.png` に配置し、UI起動時に読み込む。画像がない、または読み込めない場合は単色背景を使い、Player.logに出力する。
+- 図柄画像(任意): `images/roulette/symbol_<名前>.png`。名前は `cherry` / `bell` / `bar` / `seven` / `lemon` / `plum`。ビルド時に `package/images/roulette/` とMOD出力先へコピーされる。無い図柄や読み込めない図柄はPlayer.logに出力し、文字表示に切り替える。
+- アーティファクトのアイコン(任意): `images/roulette/icon.png` / `icon_world.png`。無ければ仮アイコン。詳細・生成用プロンプトは `img_md/ルーレット/` を参照(アイコン2点・高速ルーレットのアイコン1点は32×32px、図柄6点は陰影を付けた48×48px)。アイコンの実寸は複製元に合わせる想定で、起動時に Player.log へ `複製元アイコン寸法` が出力されるので、違う場合は寸法を直す。
+- 効果音(任意): `sounds/roulette/<名前>.wav`(`.ogg` / `.mp3` も可)。ゲームはUnityのオーディオ(AudioClip)が使えずFMODで鳴らしているため、効果音もFMOD Coreの [RouletteAudio.cs](../Artifacts/Roulette/RouletteAudio.cs) で再生する。ルーレット音量にはゲーム設定の全体音量と効果音音量が反映される。形式は拡張子ではなくファイルの中身でFMODが判定する(PCM/MP3/OGGなど)。読み込み結果はPlayer.logに出力される。名前は `tick`(回転中) / `stop`(リール停止) / `reach` / `miss` / `win`(小・中・大) / `jackpot`。無い場合はコード生成音を使う。第3リールが止まった時点で、再生中の効果音(長い `tick` など)はすべて停止し、その後に結果の音を鳴らす。
+- 画像・音はゲーム起動時に1回読み込むため、差し替え後は再起動が必要。
+- カテゴリーは「ギャンブル」(ID `Gambling`)。ゲームに該当カテゴリーは無く、登録APIも無いので、`ItemDatabase` の非公開辞書 `itemCategories` に既存カテゴリー「交渉(Savvy)」を `Object.Instantiate` して登録する。`setStatus` は空にし、`comboEffectPrefab` は専用の `RouletteGamblingComboEffect` に差し替える。アイコンは複製元のもの。
+- 解放: `PlayerSpawner.OnStartServer` が `Resources.LoadAll` したアイテムだけを `unlockedCharms` に入れるため、MODのアイテムは自動では解放されない。Harmonyの Postfix で `unlockedCharms` にIDを追加している。`activeType = Default` だけでは解放されない。
+- `ItemDatabase.Register(ItemEntity)` が `OnLoadItemDatabase` 中に使える。既存アーティファクト(ID 1064)を `Object.Instantiate` で複製し、IDは `2000000100`。
+- アーティファクトは `type == Charm` で、`resourcePrefab` 上の `Charm_Basic` 派生コンポーネントが効果を持つ。インベントリの `SetItem` が `Instantiate` して `NetworkServer.Spawn` する(サーバー側で動く)。
+- そのため複製したプレハブから元の `Charm_Basic` 派生を `DestroyImmediate` し、`RouletteCharm` を `AddComponent` して `HorayModAPI.RegisterNetworkPrefab(prefab, stableKey)` で登録する(武器本体のプレハブと同じ方式)。`Weaved()` は `true` を返す必要がある。
+- 効果の有効/無効は `OnEnabledEffect` / `OnDisabledEffect`。`NetworkAvatar.OnAttackUnit` を購読する。`OnUpdate` はサーバーで有効時のみ呼ばれる。
+- ゴールド: `UnitAvatar.Money / HasMoney / SubMoney / AddMoney`。HP: `hp` / `Networkhp`、回復は `HealPercent`。
+- 無敵とダメージ強化はサーバーから `UnitAvatar.ApplyBuff` で付与する。無敵には `CharacterBuff_Invulnerable`、ダメージ強化には `RouletteDamageBuff` を使い、持続時間の終了時にゲームのバフ処理が効果を解除する。バフはネットワークプレハブとして各クライアントにも登録が必要で、`NetworkClient` が有効になる前に登録処理が走った場合は、プレイヤーアバターのクライアント側スポーン時に登録を再試行する。登録や `ApplyBuff` に失敗した場合はログに出る。
+- 無敵バフがローカルプレイヤーに付いている間は、`RouletteInvulnerabilityUI` が画面外枠のグラデーションの虹色グローと、縁に沿ってきらめく星(実行時に生成したスプライト)を表示する。
+- バフ欄の表示にはバフの `HUD_ID` が必要で、`Resources/EffectHUD` に該当するエンティティが無いと `HUD Entity = ... を探せません` とログに出て何も表示されない。そのため `RouletteBuffHUD` が `EffectHUDDatabase.Initialize` の後(とMOD読み込み後)に、コードで組み立てたHUDプレハブを持つ `EffectHUDEntity` を辞書へ追加する。バフの名前・説明は `Localization/ja-JP.json` の `buff-*` キー。
+- 範囲ダメージは `DamageInstance.GetDamage(...)` + `UnitAvatar.ApplyDamage`。敵味方の判定は `GetHostileFactionLayers` を渡して `ApplyDamage` 側に任せる。
+- UIはUnityのCanvas(ScreenSpaceOverlay)をコードで生成。画像・音声ファイルは使わず、効果音は波形をコードで生成する。
+- アーティファクトのアイコンは `images/roulette/` の画像を読み込み、無ければ `RouletteArtifact.CreateIcon` の仮アイコンを使う。
+
+## 制限・未確認事項
+- 報酬に使う抽選はサーバーで行い、コンボ用の当たり回数記録もサーバー結果に基づく。ホスト以外の所有者には `UnitAvatar.TargetSendCustomMessage` で演出開始と回転速度・当たり確率倍率だけを送り、所有者クライアントが独立して抽選する。ホストもサーバー用と演出用で別の乱数生成器を使う。演出結果はサーバーへ返さず、報酬・コンボ記録にも使わない。演出UIはルーレット所有者の画面だけに表示される。
+- 揺れはスロットUIパネルの位置だけに適用し、ゲーム背景に影響しないようメインカメラは動かさない。
+- ゲーム内での動作確認は未実施(ビルドのみ)。確認項目: アイテムが伝説ドロップ/ショップに出る、装備して攻撃すると回る、ログにプレハブ登録成功が出る。
+- 元データのデコンパイル結果は `ilspycmd` で `Assembly-CSharp.dll` から再生成できる。

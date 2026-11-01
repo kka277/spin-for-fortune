@@ -1,0 +1,19 @@
+{
+  "info": {
+    "title": "Spin for Fortune",
+    "description": "Hello World!"
+  },
+  "mod": {
+    "schemaVersion": 1,
+    "modId": "kka.spin-for-fortune",
+    "version": "0.0.6",
+    "author": "kka",
+    "multiplayer": { "installation": "everyone" },
+    "modules": [
+      { "type": "dll", "path": "bin/SpinForFortune.dll", "entryClass": "SpinForFortune.Entry" },
+      { "type": "localization", "path": "Localization" },
+      { "type": "data", "path": "images" },
+      { "type": "data", "path": "sounds" }
+    ]
+  }
+}

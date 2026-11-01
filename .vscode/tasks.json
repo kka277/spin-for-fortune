@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Prepare Workshop upload and launch Sephiria",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$ErrorActionPreference = 'Stop'; $gameDir = [System.IO.Path]::GetFullPath((Join-Path $PWD '..\\..')); dotnet build -c Release \"-p:GameDir=$gameDir\"; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $modDir = $PWD.Path; $metadataFile = Join-Path $modDir 'metadata.json'; if (-not (Test-Path -LiteralPath $metadataFile -PathType Leaf)) { throw \"Required upload file not found: $metadataFile\" }; if (-not (Test-Path -LiteralPath (Join-Path $modDir 'thumbnail.png') -PathType Leaf)) { throw 'Required upload thumbnail.png was not found.' }; $metadata = Get-Content -LiteralPath $metadataFile -Raw | ConvertFrom-Json; if (-not $metadata.mod.modules -or $metadata.mod.modules.Count -eq 0) { throw 'metadata.json does not declare any modules.' }; foreach ($module in $metadata.mod.modules) { $modulePath = Join-Path $modDir ($module.path.Replace('/', [System.IO.Path]::DirectorySeparatorChar)); if (-not (Test-Path -LiteralPath $modulePath)) { throw \"Module path not found: $($module.path)\" }; $moduleItem = Get-Item -LiteralPath $modulePath; if ($moduleItem.PSIsContainer -and -not (Get-ChildItem -LiteralPath $modulePath -File -Recurse | Select-Object -First 1)) { throw \"Module directory is empty: $($module.path)\" } }; $gameExe = [System.IO.Path]::GetFullPath((Join-Path $PWD '..\\..\\Sephiria.exe')); if (-not (Test-Path -LiteralPath $gameExe -PathType Leaf)) { throw \"Sephiria.exe was not found: $gameExe\" }; Write-Host 'Workshop files are ready. Upload the mod from the in-game Steam Workshop panel.'; Start-Process -FilePath $gameExe -WorkingDirectory (Split-Path $gameExe)"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$msCompile",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

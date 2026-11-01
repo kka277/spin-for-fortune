@@ -1,0 +1,7 @@
+/bin/
+/obj/
+/package/
+/uploadticket.json
+/.vs/
+*.user
+*.suo
