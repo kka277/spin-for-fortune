@@ -23,6 +23,7 @@ namespace SpinForFortune
         private static readonly Definition[] Definitions =
         {
             new Definition { id = DamageId("mid"), slug = "damage-mid", frameColor = new Color(0.95f, 0.5f, 0.15f) },
+            new Definition { id = DamageId("big"), slug = "damage-big", frameColor = new Color(0.9f, 0.2f, 0.16f) },
             new Definition { id = DamageId("jackpot"), slug = "damage-jackpot", frameColor = new Color(1f, 0.82f, 0.2f) },
             new Definition { id = InvulnerabilityId, slug = "invulnerable", frameColor = new Color(0.55f, 0.8f, 1f) },
             new Definition { id = ProgressId("heat"), slug = "progress-heat", frameColor = new Color(1f, 0.38f, 0.12f), showStackOneText = true },

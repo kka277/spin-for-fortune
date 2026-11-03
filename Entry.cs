@@ -22,9 +22,13 @@ namespace SpinForFortune
         private const string TestStaffNameKeyPrefix = "kka.spin-for-fortune:test-staff-";
         private HarmonyLib.Harmony harmony;
 
+        private static bool loaded = false;
+
         // プロセスごとに一度だけ呼び出されます。イベントの購読はここで一度だけ行ってください。
         protected override void OnModLoaded()
         {
+            if (loaded)
+                return;
             Debug.Log($"[SpinForFortune] OnModLoaded: {metadata.modName} v{metadata.modVersion} by {metadata.modAuthor} " +
                       $"| package={Context?.PackageRoot}");
 
@@ -40,6 +44,7 @@ namespace SpinForFortune
             HorayModAPI.OnFloorAllocatedClientside += HandleFloorAllocatedClientside;
             HorayModAPI.OnPlayerAvatarSpawnedServerside += HandlePlayerSpawnedServer;
             HorayModAPI.OnPlayerAvatarSpawnedClientside += HandlePlayerSpawnedClient;
+            loaded = true;
         }
 
         private void HandleItemDatabaseLoaded()

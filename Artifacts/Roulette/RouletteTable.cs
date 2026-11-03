@@ -51,8 +51,11 @@ namespace SpinForFortune
         public const float SmallAttackMultiplier = 0.5f;
         public const int MidBuffDamageBonus = 50;
         public const float MidBuffSeconds = 15f;
+        public const int MidBuffAttackSpeedBonus = 20;
         public const float MidAttackMultiplier = 1f;
-        public const float BigHealPercent = 25f;
+        public const float BigHealPercent = 50f;
+        public const int BigBuffDamageBonus = 70;
+        public const float BigBuffSeconds = 15f;
         public const float BigAttackMultiplier = 1.5f;
         public const float BigDamageRadius = 14f;
         public const float BigBaseDamage = 100f;

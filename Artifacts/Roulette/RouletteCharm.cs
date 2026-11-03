@@ -92,10 +92,22 @@ namespace SpinForFortune
         {
             if (!IsEffectEnabled || NetworkAvatar == null || NetworkAvatar.IsDead || target == null)
                 return;
-            if (target is DamageDummy || target is Unit_Scarecrow)
+            if (target.monsterType == EMonsterType.Dummy || damage.fromType != EDamageFromType.DirectAttack)
                 return;
-            if (damage.fromType != EDamageFromType.DirectAttack ||
-                pending != null || freeChainActive || cooldown > 0f)
+
+            if (RouletteInvulnerabilityBuff.IsActiveFor(NetworkAvatar))
+            {
+                int activeGamblingPieces = NetworkAvatar.Inventory == null
+                    ? 0
+                    : NetworkAvatar.Inventory.GetSetEffectCount(RouletteArtifact.GamblingCategoryId);
+                float reward = RouletteProgression.GetRewardMultiplier(activeGamblingPieces);
+                if (RouletteProgression.GetFeverSeconds(NetworkAvatar) > 0f)
+                    reward *= RouletteProgression.FeverRewardMultiplier;
+                DamageNearbyEnemies(reward, RouletteTable.SmallAttackMultiplier,
+                    $"{RouletteArtifact.ModId}:damage-roulette-small", RouletteTier.Small);
+            }
+
+            if (pending != null || freeChainActive || cooldown > 0f)
                 return;
 
             var parameters = RouletteModifierCharm.Collect(NetworkAvatar);
@@ -215,22 +227,29 @@ namespace SpinForFortune
             {
                 case RouletteTier.Small:
                     NetworkAvatar.AddMoney(Scale(RouletteTable.SmallMoney, reward));
-                    DamageNearbyEnemies(reward, RouletteTable.SmallAttackMultiplier, "roulette-small", RouletteTier.Small);
+                    DamageNearbyEnemies(reward, RouletteTable.SmallAttackMultiplier, $"{RouletteArtifact.ModId}:damage-roulette-small", RouletteTier.Small);
                     break;
                 case RouletteTier.Mid:
                 {
                     var midBuff = NetworkAvatar.ApplyBuff(RouletteArtifact.MidDamageBuff, reward, NetworkAvatar);
                     if (midBuff == null)
-                        Debug.LogError("[SpinForFortune] 中当たりの攻撃力バフを付与できませんでした。");
+                        Debug.LogError("[SpinForFortune] 中当たりのバフを付与できませんでした。");
                     else
                         midBuff.BuffDuration *= parameters.buffDurationMultiplier;
-                    DamageNearbyEnemies(reward, RouletteTable.MidAttackMultiplier, "roulette-mid", RouletteTier.Mid);
+                    DamageNearbyEnemies(reward, RouletteTable.MidAttackMultiplier, $"{RouletteArtifact.ModId}:damage-roulette-mid", RouletteTier.Mid);
                     break;
                 }
                 case RouletteTier.Big:
+                {
                     NetworkAvatar.HealPercent(RouletteTable.BigHealPercent * reward);
-                    DamageNearbyEnemies(reward, RouletteTable.BigAttackMultiplier, "roulette-big", RouletteTier.Big);
+                    var bigBuff = NetworkAvatar.ApplyBuff(RouletteArtifact.BigDamageBuff, reward, NetworkAvatar);
+                    if (bigBuff == null)
+                        Debug.LogError("[SpinForFortune] 大当たりの攻撃力バフを付与できませんでした。");
+                    else
+                        bigBuff.BuffDuration *= parameters.buffDurationMultiplier;
+                    DamageNearbyEnemies(reward, RouletteTable.BigAttackMultiplier, $"{RouletteArtifact.ModId}:damage-roulette-big", RouletteTier.Big);
                     break;
+                }
                 case RouletteTier.Jackpot:
                 {
                     NetworkAvatar.AddMoney(Scale(RouletteTable.JackpotMoney, reward));
@@ -245,7 +264,7 @@ namespace SpinForFortune
                         Debug.LogError("[SpinForFortune] ジャックポットの攻撃力バフを付与できませんでした。");
                     else
                         jackpotBuff.BuffDuration *= parameters.buffDurationMultiplier;
-                    DamageNearbyEnemies(reward, RouletteTable.JackpotAttackMultiplier, "roulette-jackpot", RouletteTier.Jackpot);
+                    DamageNearbyEnemies(reward, RouletteTable.JackpotAttackMultiplier, $"{RouletteArtifact.ModId}:damage-roulette-jackpot", RouletteTier.Jackpot);
                     break;
                 }
             }
@@ -350,18 +369,21 @@ namespace SpinForFortune
         {
             float highestDamage = NetworkAvatar.GetStatWithFormula("HIGHEST", out EDamageElementalType elementalType);
             float damage = highestDamage * 4f * rewardMultiplier * attackMultiplier;
+            string localizedDamageSource = new LocalizedString(damageSource).ToString();
             Vector3 origin = NetworkAvatar.transform.position;
             long hostile = NetworkAvatar.GetHostileFactionLayers(EDamageFromType.None);
             var impactPositions = new List<Vector3>();
-            foreach (var unit in FindObjectsByType<UnitAvatar>(FindObjectsSortMode.None))
+            List<UnitAvatar> allCreatures = CombatManager.Instance.AllCreatures;
+            for (int num2 = allCreatures.Count - 1; num2 >= 0; num2--)
             {
+                var unit = allCreatures[num2];
                 if (unit == null || unit == NetworkAvatar || unit.IsDead)
                     continue;
                 if ((unit.transform.position - origin).sqrMagnitude > RouletteTable.BigDamageRadius * RouletteTable.BigDamageRadius)
                     continue;
 
                 Vector3 impactPosition = unit.transform.position;
-                var instance = DamageInstance.GetDamage(NetworkAvatar, damageSource, impactPosition, hostile, damage,
+                var instance = DamageInstance.GetDamage(NetworkAvatar, localizedDamageSource, impactPosition, hostile, damage,
                     EDamageType.Projectile, EDamageFromType.None, Vector2.zero, 1, 1f);
                 instance.elementalType = elementalType;
                 var result = unit.ApplyDamage(instance);

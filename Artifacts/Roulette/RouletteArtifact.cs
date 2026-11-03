@@ -17,6 +17,7 @@ namespace SpinForFortune
         private static GameObject gamblingComboPrefab;
 
         public static RouletteDamageBuff MidDamageBuff { get; private set; }
+        public static RouletteDamageBuff BigDamageBuff { get; private set; }
         public static RouletteDamageBuff JackpotDamageBuff { get; private set; }
         public static RouletteInvulnerabilityBuff InvulnerabilityBuff { get; private set; }
         internal static RouletteProgressBuff HeatProgressBuff { get; private set; }
@@ -25,6 +26,10 @@ namespace SpinForFortune
         internal static string ModId => modId;
         internal const string HeatDetailKeyword = "SpinForFortune_Roulette_Heat";
         internal const string StreakDetailKeyword = "SpinForFortune_Roulette_Streak";
+        internal const string MidBuffDetailKeyword = "SpinForFortune_Roulette_MidBuff";
+        internal const string BigBuffDetailKeyword = "SpinForFortune_Roulette_BigBuff";
+        internal const string JackpotBuffDetailKeyword = "SpinForFortune_Roulette_JackpotBuff";
+        internal const string InvulnerabilityDetailKeyword = "SpinForFortune_Roulette_Invulnerability";
 
         // 登録するアーティファクトの定義。強化アーティファクトを足すときは、ここに1件足す。
         private class Definition
@@ -35,13 +40,18 @@ namespace SpinForFortune
             public int cost;
             public System.Type charmType;
             public string iconFile;
-            public string worldIconFile;
+            public bool uniqueEffect;
         }
 
         private static readonly Definition[] Definitions =
         {
-            new Definition { id = RouletteTable.ItemId, slug = "roulette", rarity = EItemRarity.Legend, cost = 1200, charmType = typeof(RouletteCharm), iconFile = "icon.png", worldIconFile = "icon_world.png" },
-            new Definition { id = RouletteSpeedUpCharm.ItemId, slug = "roulette-speedup", rarity = EItemRarity.Rare, cost = 500, charmType = typeof(RouletteSpeedUpCharm), iconFile = "speedup_icon.png", worldIconFile = "speedup_icon_world.png" },
+            new Definition { id = RouletteTable.ItemId, slug = "roulette", rarity = EItemRarity.Legend, cost = 1200, charmType = typeof(RouletteCharm), iconFile = "icon.png", uniqueEffect = true },
+            new Definition { id = RouletteSpeedUpCharm.ItemId, slug = "roulette-speedup", rarity = EItemRarity.Rare, cost = 500, charmType = typeof(RouletteSpeedUpCharm), iconFile = "speedup_icon.png" },
+            new Definition { id = RouletteLuckyHorseshoeCharm.ItemId, slug = "roulette-lucky-horseshoe", rarity = EItemRarity.Rare, cost = 600, charmType = typeof(RouletteLuckyHorseshoeCharm), iconFile = "lucky_horseshoe_icon.png" },
+            new Definition { id = RouletteGreedyWagerCharm.ItemId, slug = "roulette-greedy-wager", rarity = EItemRarity.Legend, cost = 900, charmType = typeof(RouletteGreedyWagerCharm), iconFile = "greedy_wager_icon.png" },
+            new Definition { id = RouletteMiserPurseCharm.ItemId, slug = "roulette-miser-purse", rarity = EItemRarity.Rare, cost = 500, charmType = typeof(RouletteMiserPurseCharm), iconFile = "miser_purse_icon.png" },
+            new Definition { id = RouletteBloodContractCharm.ItemId, slug = "roulette-blood-contract", rarity = EItemRarity.Rare, cost = 500, charmType = typeof(RouletteBloodContractCharm), iconFile = "blood_contract_icon.png" },
+            new Definition { id = RouletteFeverAmuletCharm.ItemId, slug = "roulette-fever-amulet", rarity = EItemRarity.Legend, cost = 800, charmType = typeof(RouletteFeverAmuletCharm), iconFile = "fever_amulet_icon.png" },
         };
 
         public static void Register(string id)
@@ -57,7 +67,9 @@ namespace SpinForFortune
             foreach (var definition in Definitions)
                 RegisterItem(template, definition);
 
-            MidDamageBuff = CreateDamageBuff("mid", RouletteTable.MidBuffDamageBonus, RouletteTable.MidBuffSeconds);
+            MidDamageBuff = CreateDamageBuff("mid", RouletteTable.MidBuffDamageBonus, RouletteTable.MidBuffSeconds,
+                RouletteTable.MidBuffAttackSpeedBonus);
+            BigDamageBuff = CreateDamageBuff("big", RouletteTable.BigBuffDamageBonus, RouletteTable.BigBuffSeconds);
             JackpotDamageBuff = CreateDamageBuff("jackpot", RouletteTable.JackpotBuffDamageBonus, RouletteTable.JackpotBuffSeconds);
             InvulnerabilityBuff = CreateInvulnerabilityBuff(RouletteTable.JackpotInvincibleSeconds);
             HeatProgressBuff = CreateProgressBuff("heat");
@@ -80,7 +92,7 @@ namespace SpinForFortune
             return buff;
         }
 
-        private static RouletteDamageBuff CreateDamageBuff(string suffix, int damageBonus, float duration)
+        private static RouletteDamageBuff CreateDamageBuff(string suffix, int damageBonus, float duration, int attackSpeedBonus = 0)
         {
             string key = $"{modId}:roulette-damage-{suffix}-buff";
             var prefab = new GameObject(key);
@@ -89,6 +101,7 @@ namespace SpinForFortune
             var buff = prefab.AddComponent<RouletteDamageBuff>();
             buff.customID = suffix;
             buff.damageBonus = damageBonus;
+            buff.attackSpeedBonus = attackSpeedBonus;
             buff.defaultDuration = duration;
             buff.HUD_ID = RouletteBuffHUD.DamageId(suffix);
             pendingPrefabs.Add(new KeyValuePair<string, GameObject>(key, prefab));
@@ -141,8 +154,7 @@ namespace SpinForFortune
             item.customCost = true;
             item.categories = new List<string> { EnsureGamblingCategory() };
             item.icon = LoadIcon(definition.iconFile, template.icon) ?? CreateIcon(template.icon);
-            item.iconInWorld = LoadIcon(definition.worldIconFile, template.iconInWorld != null ? template.iconInWorld : template.icon)
-                ?? item.icon;
+            item.iconInWorld = template.iconInWorld != null ? template.iconInWorld : template.icon;
 
             var key = $"{modId}:{definition.slug}-charm";
             var prefab = BuildPrefab(template.resourcePrefab, key, definition);
@@ -224,9 +236,23 @@ namespace SpinForFortune
 
             RegisterComboInfoKeyword(HeatDetailKeyword, "heat");
             RegisterComboInfoKeyword(StreakDetailKeyword, "streak");
+            RegisterBuffDetailKeyword(MidBuffDetailKeyword, "damage-mid");
+            RegisterBuffDetailKeyword(BigBuffDetailKeyword, "damage-big");
+            RegisterBuffDetailKeyword(JackpotBuffDetailKeyword, "damage-jackpot");
+            RegisterBuffDetailKeyword(InvulnerabilityDetailKeyword, "invulnerable");
         }
 
         private static void RegisterComboInfoKeyword(string keywordId, string suffix)
+        {
+            RegisterDetailKeyword(keywordId, $"buff-progress-{suffix}-name", $"roulette-tag-{suffix}-description");
+        }
+
+        private static void RegisterBuffDetailKeyword(string keywordId, string suffix)
+        {
+            RegisterDetailKeyword(keywordId, $"buff-{suffix}-name", $"roulette-tag-{suffix}-description");
+        }
+
+        private static void RegisterDetailKeyword(string keywordId, string nameLocalizationKey, string descriptionLocalizationKey)
         {
             if (KeywordDatabase.GetEntity(keywordId) != null)
             {
@@ -235,11 +261,11 @@ namespace SpinForFortune
             }
 
             var entity = ScriptableObject.CreateInstance<KeywordEntity>();
-            entity.name = $"{modId}:{suffix}-detail";
+            entity.name = $"{modId}:{nameLocalizationKey}-detail";
             entity.keyword = keywordId;
             entity.displayDetails = true;
-            entity.visualText = new LocalizedString($"{modId}:buff-progress-{suffix}-name");
-            entity.description = new LocalizedString($"{modId}:buff-progress-{suffix}-flavor");
+            entity.visualText = new LocalizedString($"{modId}:{nameLocalizationKey}");
+            entity.description = new LocalizedString($"{modId}:{descriptionLocalizationKey}");
             KeywordDatabase.Register(entity);
         }
 
@@ -316,6 +342,7 @@ namespace SpinForFortune
 
             var charm = (Charm_Basic)prefab.AddComponent(definition.charmType);
             charm.maxLevel = 1;
+            charm.isUniqueEffect = definition.uniqueEffect;
             charm.effectsString = new[] { new LocalizedString($"{modId}:{definition.slug}-effect") };
             return prefab;
         }

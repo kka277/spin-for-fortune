@@ -6,13 +6,15 @@ namespace SpinForFortune
 {
     public class RouletteGamblingComboEffect : ComboEffectBase
     {
+        private bool rouletteGrantPending;
+
         public override EComboEnableResult Enable(int comboCount, out int appliedComboEffectCount)
         {
             var result = base.Enable(comboCount, out appliedComboEffectCount);
             if (isEnabled)
             {
                 RouletteProgression.EnableCombo(avatar);
-                RouletteArtifact.GrantRouletteIfMissing(avatar);
+                rouletteGrantPending = true;
             }
             return result;
         }
@@ -27,6 +29,12 @@ namespace SpinForFortune
         {
             if (!Mirror.NetworkServer.active || !isEnabled)
                 return;
+
+            if (rouletteGrantPending)
+            {
+                rouletteGrantPending = false;
+                RouletteArtifact.GrantRouletteIfMissing(avatar);
+            }
 
             RouletteProgression.ResetOnDeath(avatar);
             RouletteProgression.Tick(avatar, UnityEngine.Time.deltaTime);
