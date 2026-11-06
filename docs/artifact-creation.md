@@ -9,8 +9,8 @@
 ## 追加手順
 
 1. **一意なIDと名前キーを決める**
-   - 他MODと衝突しないIDを選び、コード内で定数にします。例: `RouletteSpeedUpCharm.ItemId = 2000000101`。
-   - `ItemEntity.name` は `<ID>_<slug>` 形式にします(例: `2000000101_roulette-speedup`)。ローカライズキーにはMOD IDを含め、`<modId>:<slug>-name` のようにします。`modId` は `metadata.json` の値を使います。
+   - 他MODと衝突しないIDを選び、コード内で定数にします。例: `RouletteSpeedUpCharm.ItemId = 100001`。
+   - `ItemEntity.name` は `<ID>_<slug>` 形式にします(例: `100001_roulette-speedup`)。ローカライズキーにはMOD IDを含め、`<modId>:<slug>-name` のようにします。`modId` は `metadata.json` の値を使います。
 2. **効果クラスを作る**
    - `Charm_Basic` を継承し、効果やイベント購読を実装します。
    - 効果を有効化するときは `OnEnabledEffect`、解除時は `OnDisabledEffect` をオーバーライドし、購読と解除を対にします。

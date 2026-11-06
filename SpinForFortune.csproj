@@ -40,11 +40,11 @@
     <Compile Include="Artifacts\Roulette\Audio\RouletteAudio.cs" />
     <Compile Include="Artifacts\Roulette\RouletteParams.cs" />
     <Compile Include="Artifacts\Roulette\RouletteModifierCharm.cs" />
-    <Compile Include="Artifacts\Roulette\Modifiers\RouletteLuckyHorseshoeCharm.cs" />
-    <Compile Include="Artifacts\Roulette\Modifiers\RouletteGreedyWagerCharm.cs" />
-    <Compile Include="Artifacts\Roulette\Modifiers\RouletteMiserPurseCharm.cs" />
-    <Compile Include="Artifacts\Roulette\Modifiers\RouletteBloodContractCharm.cs" />
-    <Compile Include="Artifacts\Roulette\Modifiers\RouletteFeverAmuletCharm.cs" />
+    <Compile Include="Artifacts\LuckyHorseshoe\RouletteLuckyHorseshoeCharm.cs" />
+    <Compile Include="Artifacts\GreedyWager\RouletteGreedyWagerCharm.cs" />
+    <Compile Include="Artifacts\MiserPurse\RouletteMiserPurseCharm.cs" />
+    <Compile Include="Artifacts\BloodContract\RouletteBloodContractCharm.cs" />
+    <Compile Include="Artifacts\FeverAmulet\RouletteFeverAmuletCharm.cs" />
     <Compile Include="Artifacts\Roulette\RouletteGamblingComboEffect.cs" />
     <Compile Include="Artifacts\RouletteSpeedUp\RouletteSpeedUpCharm.cs" />
   </ItemGroup>

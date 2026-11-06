@@ -33,6 +33,8 @@ namespace SpinForFortune
         private static RouletteDamageEffects instance;
         private static Sprite sparkleSprite;
         private static Sprite glowSprite;
+        private static readonly Sprite[] outcomeSprites = new Sprite[4];
+        private static readonly bool[] outcomeSpriteLoadAttempted = new bool[4];
 
         private readonly List<Impact> impacts = new List<Impact>();
         private RectTransform canvasRect;
@@ -97,7 +99,10 @@ namespace SpinForFortune
 
             var group = root.GetComponent<CanvasGroup>();
             var glow = CreateImage(rect, "SoftGlow", glowSprite, color, new Vector2(120f, 120f));
-            var core = CreateImage(rect, "CenterSparkle", sparkleSprite, Color.white, new Vector2(56f, 56f)).rectTransform;
+            var outcomeSprite = LoadOutcomeSprite(tier);
+            var coreImage = CreateImage(rect, "OutcomeSymbol", outcomeSprite ?? sparkleSprite, Color.white, new Vector2(56f, 56f));
+            coreImage.preserveAspect = true;
+            var core = coreImage.rectTransform;
             core.localScale = Vector3.one * 1.2f;
 
             var sparks = new List<Spark>(sparkCount);
@@ -159,6 +164,42 @@ namespace SpinForFortune
                 Duration = duration,
                 Time = 0f
             });
+        }
+
+        private static Sprite LoadOutcomeSprite(RouletteTier tier)
+        {
+            int symbol = RouletteTable.SymbolOf(tier);
+            if (symbol < 0 || symbol >= outcomeSprites.Length)
+                return null;
+            if (outcomeSpriteLoadAttempted[symbol])
+                return outcomeSprites[symbol];
+
+            outcomeSpriteLoadAttempted[symbol] = true;
+            var path = System.IO.Path.Combine(
+                RouletteUI.PackageRoot ?? "",
+                "images",
+                "roulette",
+                $"symbol_{RouletteTable.SymbolFileNames[symbol]}.png");
+            if (!System.IO.File.Exists(path))
+                return null;
+
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            if (!ImageConversion.LoadImage(texture, System.IO.File.ReadAllBytes(path)))
+            {
+                Debug.LogError($"[SpinForFortune] 当たり図柄画像を読み込めません: {path}");
+                return null;
+            }
+
+            outcomeSprites[symbol] = Sprite.Create(
+                texture,
+                new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+            return outcomeSprites[symbol];
         }
 
         private void Update()

@@ -8,7 +8,7 @@
 - コスト: 30ゴールド。足りなければHP5(HPは1未満にならない。HPも足りなければ回さない)。
 - ジャックポットの無敵中に武器の直接攻撃が敵に当たると、通常スピンとは別に小当たり相当の範囲攻撃を追加で発生させる。追加攻撃にクールダウンはない。
 - サーバーが当たり判定と報酬を処理し、確定した図柄・当たり結果を所有者へ送る。画面右下には3リールのスロット(`RouletteUI`)を表示し、画面中央のボスゲージなどと重ならないようにする。最初の2リールが揃うとリーチ(最後のリールがスロー回転、フラッシュ・枠の明滅・スロットUIパネルの揺れ・効果音)を表示する。演出と報酬結果は一致する。
-- ルーレット所有者の画面で、範囲ダメージが入った敵の位置から色付きの火花が放射状に飛び散り、中央に光と大きな当たり名を表示する。「BIG HIT!」などの文字は太い縁取りで読みやすくし、火花・光・文字の演出全体を拡大する。上位当たりほど演出サイズ・火花の数・飛距離・表示時間を増やす。ダメージを受けていない敵には表示しない。
+- ルーレット所有者の画面で、範囲ダメージが入った敵の位置から色付きの火花が放射状に飛び散り、中央に当たり段階に対応する出目画像(小=チェリー、中=ベル、大=BAR、ジャックポット=7)と大きな当たり名を表示する。出目画像が読み込めない場合は星型スパークにフォールバックする。「BIG HIT!」などの文字は太い縁取りで読みやすくし、火花・光・文字の演出全体を拡大する。上位当たりほど演出サイズ・火花の数・飛距離・表示時間を増やす。ダメージを受けていない敵には表示しない。
 - 熱狂・連勝・フィーバーの進行状況は、ギャンブルコンボ2個以上で標準バフ欄に個別アイコンとして表示する。熱狂・連勝は値が1以上の間だけ表示し、アイコンのスタック数で値を確認できる。フィーバーは発動中に表示し、残り時間を確認できる。当たり回数は内部で記録し、画面には表示しない。
 - ギャンブルカテゴリのコンボ説明欄には2/4/6個の段階報酬を標準形式で表示する。熱狂・連勝はコンボ効果欄の別々の `<tag>` として表示し、バニラのコンボツールチップ内に詳細カードを表示する。ルーレットのアイテム説明でも中・大・ジャックポットのダメージバフと無敵を `<tag>` で表示し、それぞれ既存バフ説明の詳細カードを開ける。フィーバー・無料スピン連鎖はカテゴリ説明欄に表示する。各バフアイコンにも個別の説明と現在値・残り時間を表示する。地面に置いたときは、全アーティファクトで複製元のバニラ地面用アイコンを共有する。
 - ジャックポットの無敵中は、ローカルプレイヤーの画面外枠に虹色のグローと、縁に沿ってきらめく星の模様が出る。
@@ -34,16 +34,16 @@
 - 強化アーティファクトは [RouletteModifierCharm.cs](../Artifacts/Roulette/RouletteModifierCharm.cs) を継承し、`Modify(RouletteParams)` で倍率を掛けるだけでよい。装備中のものは有効化時に静的リストへ登録され、`RouletteModifierCharm.Collect(owner)` が同じ持ち主の分を全部掛け合わせる。複数装備すると倍率は掛け算で重なる。プレイヤーの幸運も当たり確率倍率に加算される。
 - `RouletteCharm` は攻撃のたびに `Collect` で調整値を取り、消費・抽選・演出の速さ・報酬に反映する(`RouletteSpin.speed` 経由でUIの停止時刻も変わる)。
 - 新しい強化アーティファクトを足す手順: ①`RouletteModifierCharm` を継承したクラスを作る(IDを定数で持つ) ②`RouletteArtifact.Definitions` に1件足す(ID・名前の元になるslug・レア度・価格・クラス・アイコン名) ③`Localization/ja-JP.json` に `<slug>-name` / `-flavor` / `-effect` を足す ④csproj に `Compile Include` を足す ⑤`img_md/ルーレット_作り直し/` にアイコンのプロンプトを足す。アイテムオブジェクト名は共通登録処理で `<ID>_<slug>` 形式にする。解放処理と プレハブ登録は `Definitions` を回すので追加不要。
-- 「高速ルーレット」は別ID (`2000000101`) の独立したアーティファクトなので、固有コードは [Artifacts/RouletteSpeedUp/](../Artifacts/RouletteSpeedUp/) に置く。共通の強化処理は [RouletteModifierCharm.cs](../Artifacts/Roulette/RouletteModifierCharm.cs) を使う。レア、回転速度1.5倍。アイコン: `images/roulette/speedup_icon.png`。
+- 「高速ルーレット」は別ID (`100001`) の独立したアーティファクトなので、固有コードは [Artifacts/RouletteSpeedUp/](../Artifacts/RouletteSpeedUp/) に置く。共通の強化処理は [RouletteModifierCharm.cs](../Artifacts/Roulette/RouletteModifierCharm.cs) を使う。レア、回転速度1.5倍。アイコン: `images/roulette/speedup_icon.png`。
 - 追加した強化アーティファクトは次のとおり。各倍率は所持者のルーレットに適用され、複数所持時は相互に乗算する。
 
 | ID | アーティファクト | レア度・価格 | 効果 |
 |---|---|---|---|
-| 2000000102 | 幸運の蹄鉄 | レア・600G | 当たり確率×1.25、報酬×0.8 |
-| 2000000103 | 強欲な賭け札 | 伝説・900G | 報酬×1.5、当たり確率×0.75 |
-| 2000000104 | 倹約家の財布 | レア・500G | ゴールド消費×0.6、クールダウン×1.2 |
-| 2000000105 | 血の契約 | レア・500G | HP消費×0.5、ゴールド消費×1.2 |
-| 2000000106 | 熱狂の護符 | 伝説・800G | バフ時間×1.5、クールダウン×1.2 |
+| 100002 | 幸運の蹄鉄 | レア・600G | 当たり確率×1.25、報酬×0.8 |
+| 100003 | 強欲な賭け札 | 伝説・900G | 報酬×1.5、当たり確率×0.75 |
+| 100004 | 倹約家の財布 | レア・500G | ゴールド消費×0.6、クールダウン×1.2 |
+| 100005 | 血の契約 | レア・500G | HP消費×0.5、ゴールド消費×1.2 |
+| 100006 | 熱狂の護符 | 伝説・800G | バフ時間×1.5、クールダウン×1.2 |
 
 - 当たり確率倍率は各当たりの確率に掛かり、報酬倍率はゴールド・回復・範囲ダメージ・ダメージバフ量に掛かる。バフ時間倍率はダメージバフとジャックポットの無敵時間にも適用される。
 - 倹約家の財布と血の契約のゴールド消費倍率は、ゴールドで支払える場合に使われる。ゴールド不足時はHPで支払い、血の契約のHP消費倍率が適用される。
@@ -62,14 +62,14 @@
 - 画像・音はゲーム起動時に1回読み込むため、差し替え後は再起動が必要。
 - カテゴリーは「ギャンブル」(ID `Gambling`)。ゲームに該当カテゴリーは無く、登録APIも無いので、`ItemDatabase` の非公開辞書 `itemCategories` に既存カテゴリー「交渉(Savvy)」を `Object.Instantiate` して登録する。`setStatus` は空にし、`comboEffectPrefab` は専用の `RouletteGamblingComboEffect` に差し替える。アイコンは複製元のもの。
 - 解放: `PlayerSpawner.OnStartServer` が `Resources.LoadAll` したアイテムだけを `unlockedCharms` に入れるため、MODのアイテムは自動では解放されない。Harmonyの Postfix で `unlockedCharms` にIDを追加している。`activeType = Default` だけでは解放されない。
-- `ItemDatabase.Register(ItemEntity)` が `OnLoadItemDatabase` 中に使える。既存アーティファクト(ID 1064)を `Object.Instantiate` で複製し、IDは `2000000100`。
+- `ItemDatabase.Register(ItemEntity)` が `OnLoadItemDatabase` 中に使える。既存アーティファクト(ID 1064)を `Object.Instantiate` で複製し、IDは `100000`。
 - アーティファクトは `type == Charm` で、`resourcePrefab` 上の `Charm_Basic` 派生コンポーネントが効果を持つ。インベントリの `SetItem` が `Instantiate` して `NetworkServer.Spawn` する(サーバー側で動く)。
 - そのため複製したプレハブから元の `Charm_Basic` 派生を `DestroyImmediate` し、`RouletteCharm` を `AddComponent` して `HorayModAPI.RegisterNetworkPrefab(prefab, stableKey)` で登録する(武器本体のプレハブと同じ方式)。`Weaved()` は `true` を返す必要がある。
 - 効果の有効/無効は `OnEnabledEffect` / `OnDisabledEffect`。`NetworkAvatar.OnAttackUnit` を購読する。`OnUpdate` はサーバーで有効時のみ呼ばれる。
 - ゴールド: `UnitAvatar.Money / HasMoney / SubMoney / AddMoney`。HP: `hp` / `Networkhp`、回復は `HealPercent`。
 - 無敵とダメージ強化はサーバーから `UnitAvatar.ApplyBuff` で付与する。無敵には `CharacterBuff_Invulnerable`、ダメージ強化には `RouletteDamageBuff` を使い、持続時間の終了時にゲームのバフ処理が効果を解除する。バフはネットワークプレハブとして各クライアントにも登録が必要で、`NetworkClient` が有効になる前に登録処理が走った場合は、プレイヤーアバターのクライアント側スポーン時に登録を再試行する。登録や `ApplyBuff` に失敗した場合はログに出る。
 - 無敵バフがローカルプレイヤーに付いている間は、`RouletteInvulnerabilityUI` が画面外枠のグラデーションの虹色グローと、縁に沿ってきらめく星(実行時に生成したスプライト)を表示する。
-- バフ欄の表示にはバフの `HUD_ID` が必要で、`Resources/EffectHUD` に該当するエンティティが無いと `HUD Entity = ... を探せません` とログに出て何も表示されない。そのため `RouletteBuffHUD` が `EffectHUDDatabase.Initialize` の後(とMOD読み込み後)に、コードで組み立てたHUDプレハブを持つ `EffectHUDEntity` を辞書へ追加する。バフの名前・説明は `Localization/ja-JP.json` の `buff-*` キー。
+- バフ欄の表示にはバフの `HUD_ID` が必要で、`Resources/EffectHUD` に該当するエンティティが無いと `HUD Entity = ... を探せません` とログに出て何も表示されない。そのため `RouletteBuffHUD` が `EffectHUDDatabase.Initialize` の後(とMOD読み込み後)に、コードで組み立てたHUDプレハブを持つ `EffectHUDEntity` を辞書へ追加する。バフの名前・説明は `Localization/ja-JP.json` の `buff-*` キー。当たり時のバフアイコンは出目に合わせ、中は `symbol_bell.png`、大は `symbol_bar.png`、ジャックポットの攻撃強化と無敵は `symbol_seven.png` を使う。熱狂・連勝・フィーバーはそれぞれ `progress_heat_icon.png`、`progress_streak_icon.png`、`progress_fever_icon.png` を使う。全カスタムバフは暗い赤紫の背景に、バフ種別ごとの色で四隅のピクセル飾りを付ける。それ以外は `icon.png` を使う。画像を変更した公開版はReleaseビルドで `package/` を更新し、ワークショップへ再アップロードする。
 - 範囲ダメージは `DamageInstance.GetDamage(...)` + `UnitAvatar.ApplyDamage`。ダメージ一覧の分類名には当たりごとのMOD翻訳キー(`damage-roulette-small/mid/big/jackpot`)を `LocalizedString` で解決して渡す。生のキーを渡すとダメージ一覧にキー名が表示される。敵味方の判定は `GetHostileFactionLayers` を渡して `ApplyDamage` 側に任せる。
 - UIはUnityのCanvas(ScreenSpaceOverlay)をコードで生成。画像・音声ファイルは使わず、効果音は波形をコードで生成する。
 - アーティファクトのアイコンは `images/roulette/` の画像を読み込み、無ければ `RouletteArtifact.CreateIcon` の仮アイコンを使う。

@@ -11,24 +11,26 @@ namespace SpinForFortune
         private const string IdPrefix = "PHYSICALDAMAGEPLUS_ROULETTE_";
         public const string InvulnerabilityId = IdPrefix + "INVULNERABLE";
         private const float HudSize = 16f;
+        private static readonly Color FrameColor = new Color(0.16f, 0.04f, 0.08f);
 
         private class Definition
         {
             public string id;
             public string slug; // ローカライズキーの元になる名前
-            public Color frameColor;
+            public string iconFile;
+            public Color accentColor;
             public bool showStackOneText;
         }
 
         private static readonly Definition[] Definitions =
         {
-            new Definition { id = DamageId("mid"), slug = "damage-mid", frameColor = new Color(0.95f, 0.5f, 0.15f) },
-            new Definition { id = DamageId("big"), slug = "damage-big", frameColor = new Color(0.9f, 0.2f, 0.16f) },
-            new Definition { id = DamageId("jackpot"), slug = "damage-jackpot", frameColor = new Color(1f, 0.82f, 0.2f) },
-            new Definition { id = InvulnerabilityId, slug = "invulnerable", frameColor = new Color(0.55f, 0.8f, 1f) },
-            new Definition { id = ProgressId("heat"), slug = "progress-heat", frameColor = new Color(1f, 0.38f, 0.12f), showStackOneText = true },
-            new Definition { id = ProgressId("streak"), slug = "progress-streak", frameColor = new Color(0.95f, 0.72f, 0.2f), showStackOneText = true },
-            new Definition { id = ProgressId("fever"), slug = "progress-fever", frameColor = new Color(1f, 0.88f, 0.32f) },
+            new Definition { id = DamageId("mid"), slug = "damage-mid", iconFile = "symbol_bell.png", accentColor = new Color(0.95f, 0.72f, 0.2f) },
+            new Definition { id = DamageId("big"), slug = "damage-big", iconFile = "symbol_bar.png", accentColor = new Color(0.88f, 0.22f, 0.16f) },
+            new Definition { id = DamageId("jackpot"), slug = "damage-jackpot", iconFile = "symbol_seven.png", accentColor = new Color(1f, 0.82f, 0.2f) },
+            new Definition { id = InvulnerabilityId, slug = "invulnerable", iconFile = "symbol_seven.png", accentColor = new Color(0.72f, 0.85f, 1f) },
+            new Definition { id = ProgressId("heat"), slug = "progress-heat", iconFile = "progress_heat_icon.png", accentColor = new Color(1f, 0.38f, 0.12f), showStackOneText = true },
+            new Definition { id = ProgressId("streak"), slug = "progress-streak", iconFile = "progress_streak_icon.png", accentColor = new Color(0.95f, 0.72f, 0.2f), showStackOneText = true },
+            new Definition { id = ProgressId("fever"), slug = "progress-fever", iconFile = "progress_fever_icon.png", accentColor = new Color(1f, 0.88f, 0.32f) },
         };
 
         private static readonly Dictionary<string, EffectHUDEntity> entities = new Dictionary<string, EffectHUDEntity>();
@@ -85,15 +87,21 @@ namespace SpinForFortune
             layout.minHeight = layout.preferredHeight = HudSize;
 
             var frame = root.GetComponent<Image>();
-            frame.color = definition.frameColor;
+            frame.color = FrameColor;
 
             var solid = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height), new Vector2(0.5f, 0.5f));
 
             var icon = CreateChild(root.transform, "Icon", 1f);
-            icon.sprite = RouletteArtifact.LoadIcon("icon.png", null);
+            icon.sprite = RouletteArtifact.LoadIcon(definition.iconFile ?? "icon.png", null);
             icon.color = icon.sprite != null ? Color.white : new Color(0.3f, 0.1f, 0.15f);
             icon.preserveAspect = true;
             icon.raycastTarget = false;
+
+            var shadowAccent = definition.accentColor * 0.55f;
+            AddCornerMark(root.transform, "TopLeftAccent", new Vector2(0f, 1f), new Vector2(1f, -1f), solid, definition.accentColor);
+            AddCornerMark(root.transform, "TopRightAccent", Vector2.one, new Vector2(-1f, -1f), solid, shadowAccent);
+            AddCornerMark(root.transform, "BottomLeftAccent", Vector2.zero, new Vector2(1f, 1f), solid, shadowAccent);
+            AddCornerMark(root.transform, "BottomRightAccent", new Vector2(1f, 0f), new Vector2(-1f, 1f), solid, definition.accentColor);
 
             // 経過に応じて暗くなるタイマー表示。
             var fill = CreateChild(root.transform, "Fill", 1f);
@@ -120,6 +128,22 @@ namespace SpinForFortune
             hud.effectName = new LocalizedString($"{modId}:buff-{definition.slug}-name");
             hud.effectFlavorText = new LocalizedString($"{modId}:buff-{definition.slug}-flavor");
             return root;
+        }
+
+        private static void AddCornerMark(Transform parent, string name, Vector2 anchor, Vector2 position, Sprite sprite, Color color)
+        {
+            var image = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image)).GetComponent<Image>();
+            image.transform.SetParent(parent, false);
+            image.sprite = sprite;
+            image.color = color;
+            image.raycastTarget = false;
+
+            var rect = image.rectTransform;
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = anchor;
+            rect.sizeDelta = new Vector2(2f, 2f);
+            rect.anchoredPosition = position;
         }
 
         // バニラのバフHUDのスタック数テキストを探し、見た目をそのまま流用する。

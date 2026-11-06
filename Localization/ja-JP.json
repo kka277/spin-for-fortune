@@ -52,5 +52,5 @@
   "kka.spin-for-fortune:roulette-tag-invulnerable-description": "ジャックポットの効果。20秒間、あらゆるダメージを受けない。",
   "kka.spin-for-fortune:category-gambling-fruit": "ギャンブルの実",
   "kka.spin-for-fortune:roulette-flavor": "運命の歯車は、財布の中身で回る。",
-  "kka.spin-for-fortune:roulette-effect": "武器の直接攻撃が敵に当たるたびに30ゴールドを消費してスロットを回す(0.5秒のクールダウン)。ゴールドが足りない時はHPを5消費する(HPは1未満にならず、HPも足りなければ回らない)。\n当たり時はすべて半径14の敵に範囲攻撃(物理を含む最も高い属性ダメージの400%を基準威力とし、小0.5倍・中1倍・大1.5倍・ジャックポット3倍)。\n小当たり: 50ゴールド獲得\n中当たり: 追い風発動\n<tag=SpinForFortune_Roulette_MidBuff>\n大当たり: 大当たりバフ発動n<tag=SpinForFortune_Roulette_BigBuff>\nジャックポット: ジャックポットと無敵が発動、無敵中は武器の直接攻撃が当たるたび、追加で小当たり相当の範囲攻撃を行う。\n<tag=SpinForFortune_Roulette_Invulnerability>\n<tag=SpinForFortune_Roulette_JackpotBuff>"
+  "kka.spin-for-fortune:roulette-effect": "武器の直接攻撃が敵に当たるたびに30ゴールドを消費してスロットを回す(0.5秒のクールダウン)。ゴールドが足りない時はHPを5消費する(この効果では死亡しない)。\n当たり時はすべて半径14の敵に範囲攻撃(物理を含む最も高い属性ダメージの400%を基準威力とし、小0.5倍・中1倍・大1.5倍・ジャックポット3倍)。\n小当たり: 50ゴールド獲得\n中当たり: <tag=SpinForFortune_Roulette_MidBuff>が発動\n大当たり: <tag=SpinForFortune_Roulette_BigBuff>が発動\nジャックポット: <tag=SpinForFortune_Roulette_JackpotBuff>と<tag=SpinForFortune_Roulette_Invulnerability>が発動、無敵中は武器の直接攻撃が当たるたび、追加で小当たり相当の範囲攻撃を行う。"
 }
