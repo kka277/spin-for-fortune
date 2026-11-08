@@ -253,7 +253,7 @@ namespace SpinForFortune
         private static readonly string[] SoundExtensions = { ".wav", ".ogg", ".mp3" };
 
         // 効果音は <mod>/sounds/roulette/<名前>.(wav|ogg|mp3) があればそれを使い、無ければ生成音を使う。
-        private static void LoadClip(string name, Action<RouletteSfx> assign)
+        private static RouletteSfx LoadClip(string name)
         {
             foreach (var extension in SoundExtensions)
             {
@@ -264,10 +264,11 @@ namespace SpinForFortune
                 var sfx = RouletteAudio.LoadFile(path);
                 if (sfx == null)
                     continue;
-                assign(sfx);
                 Debug.Log($"[SpinForFortune] 効果音を読み込みました: {path}");
-                return;
+                return sfx;
             }
+
+            return null;
         }
 
         private void StartReach()
@@ -511,26 +512,21 @@ namespace SpinForFortune
             rect.offsetMax = Vector2.zero;
         }
 
-        // 蜉ｹ譫憺浹縺ｯ繝輔ぃ繧､繝ｫ繧剃ｽｿ繧上★縲∵ｳ｢蠖｢繧偵さ繝ｼ繝峨〒逕滓・縺吶ｋ縲・
+        // 外部音源がない効果音だけ、コードで波形を生成する。
         private void BuildClips()
         {
-            tickClip = MakeClip("tick", 0.04f, (t, d) => (Mathf.Sin(2f * Mathf.PI * 1000f * t) > 0f ? 0.4f : -0.4f) * (1f - t / d));
-            stopClip = MakeClip("stop", 0.15f, (t, d) =>
+            tickClip = LoadClip("tick") ?? MakeClip("tick", 0.04f,
+                (t, d) => (Mathf.Sin(2f * Mathf.PI * 1000f * t) > 0f ? 0.4f : -0.4f) * (1f - t / d));
+            stopClip = LoadClip("stop") ?? MakeClip("stop", 0.15f, (t, d) =>
                 (Mathf.Sin(2f * Mathf.PI * 180f * t) * 0.7f + UnityEngine.Random.Range(-0.2f, 0.2f)) * (1f - t / d));
-            reachClip = MakeClip("reach", 1.5f, (t, d) =>
+            reachClip = LoadClip("reach") ?? MakeClip("reach", 1.5f, (t, d) =>
                 Mathf.Sin(2f * Mathf.PI * (300f * t + 400f / d * t * t)) * 0.5f * (0.7f + 0.3f * Mathf.Sin(t * 40f)) * Mathf.Min(1f, (d - t) * 4f));
-            missClip = MakeClip("miss", 0.5f, (t, d) =>
+            missClip = LoadClip("miss") ?? MakeClip("miss", 0.5f, (t, d) =>
                 Mathf.Sin(2f * Mathf.PI * (t < d / 2f ? 330f : 220f) * t) * 0.4f * (1f - t / d));
-            winClip = MakeArpeggio("win", new[] { 523f, 659f, 784f, 1047f }, 0.12f);
-            jackpotClip = MakeArpeggio("jackpot", new[] { 523f, 659f, 784f, 1047f, 1319f, 1568f, 2093f, 1568f, 2093f, 2637f }, 0.13f);
+            winClip = LoadClip("win") ?? MakeArpeggio("win", new[] { 523f, 659f, 784f, 1047f }, 0.12f);
+            jackpotClip = LoadClip("jackpot") ?? MakeArpeggio("jackpot",
+                new[] { 523f, 659f, 784f, 1047f, 1319f, 1568f, 2093f, 1568f, 2093f, 2637f }, 0.13f);
             feverClip = MakeArpeggio("fever", new[] { 659f, 880f, 1175f, 1568f, 2093f }, 0.16f);
-
-            LoadClip("tick", c => tickClip = c);
-            LoadClip("stop", c => stopClip = c);
-            LoadClip("reach", c => reachClip = c);
-            LoadClip("miss", c => missClip = c);
-            LoadClip("win", c => winClip = c);
-            LoadClip("jackpot", c => jackpotClip = c);
         }
 
         private static RouletteSfx MakeArpeggio(string name, float[] notes, float noteSeconds)
