@@ -470,6 +470,7 @@ namespace SpinForFortune
             {
                 RouletteProgression.ResetClientSnapshot();
                 player.OnCustomMessageReceivedClientside += RouletteCharm.HandleClientMessage;
+                RouletteUI.Preload();
             }
             Debug.Log($"[SpinForFortune] クライアント: {player.name} (local={player.isLocalPlayer}) PhysicalDamage={player.GetCustomStat(ECustomStat.PhysicalDamage)}");
         }

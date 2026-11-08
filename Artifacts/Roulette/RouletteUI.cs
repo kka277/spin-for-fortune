@@ -67,6 +67,12 @@ namespace SpinForFortune
 
         public static void Play(RouletteSpin spin, int freeNumber, int freeLimit)
         {
+            Preload();
+            instance.Begin(spin, freeNumber, freeLimit);
+        }
+
+        public static void Preload()
+        {
             if (instance == null)
             {
                 var go = new GameObject("SpinForFortune_RouletteUI");
@@ -74,7 +80,6 @@ namespace SpinForFortune
                 instance = go.AddComponent<RouletteUI>();
                 instance.Build();
             }
-            instance.Begin(spin, freeNumber, freeLimit);
         }
 
         public static void SetFever(float feverSeconds)
