@@ -58,8 +58,8 @@
 - レトロなスロット筐体風のUI背景画像の生成指示書は、既存の図柄・アイコン指示書とは分けて [背景画像生成プロンプト.md](../img_md/ルーレット_UI背景/背景画像生成プロンプト.md) に置く。生成画像は `images/roulette/ui_background.png` に配置し、UI起動時に読み込む。画像がない、または読み込めない場合は単色背景を使い、Player.logに出力する。
 - 図柄画像(任意): `images/roulette/symbol_<名前>.png`。名前は `cherry` / `bell` / `bar` / `seven` / `lemon` / `plum`。ビルド時に `package/images/roulette/` とMOD出力先へコピーされる。無い図柄や読み込めない図柄はPlayer.logに出力し、文字表示に切り替える。
 - アーティファクトのアイコン(任意): `images/roulette/` の各アイコン画像。無ければ仮アイコン。詳細・生成用プロンプトは `img_md/ルーレット_作り直し/` を参照(ルーレット・高速ルーレット・強化5種のアイコンは32×32px、図柄6点は陰影を付けた48×48px)。アイコンの実寸は複製元に合わせる想定で、起動時に Player.log へ `複製元アイコン寸法` が出力されるので、違う場合は寸法を直す。
-- 効果音(任意): `sounds/roulette/<名前>.wav`(`.ogg` / `.mp3` も可)。ゲームはUnityのオーディオ(AudioClip)が使えずFMODで鳴らしているため、効果音もFMOD Coreの [RouletteAudio.cs](../Artifacts/Roulette/RouletteAudio.cs) で再生する。ルーレット音量にはゲーム設定の全体音量と効果音音量が反映される。形式は拡張子ではなくファイルの中身でFMODが判定する(PCM/MP3/OGGなど)。読み込み結果はPlayer.logに出力される。名前は `tick`(回転中) / `stop`(リール停止) / `reach` / `miss` / `win`(小・中・大) / `jackpot`。無い場合はコード生成音を使う。第3リールが止まった時点で、再生中の効果音(長い `tick` など)はすべて停止し、その後に結果の音を鳴らす。
-- ルーレットUI・図柄画像・効果音はローカルプレイヤーのアバター生成時に先読みし、以後は同じUI・リソースを使う。コード生成音の波形生成とFMOD登録もこの時点で行い、初回スピン時の同期処理を避ける。画像・音の差し替え後は再起動が必要。
+- 効果音(任意): `sounds/roulette/<名前>.wav`(`.ogg` / `.mp3` も可)。ゲームはUnityのオーディオ(AudioClip)が使えずFMODで鳴らしているため、効果音もFMOD Coreの [RouletteAudio.cs](../Artifacts/Roulette/RouletteAudio.cs) で再生する。ルーレット音量にはゲーム設定の全体音量と効果音音量が反映される。形式は拡張子ではなくファイルの中身でFMODが判定する(PCM/MP3/OGGなど)。読み込み結果はPlayer.logに出力される。名前は `tick`(回転中) / `stop`(リール停止) / `reach` / `miss` / `win`(小・中・大) / `jackpot`。各ファイルを優先して読み込み、無い場合または読み込みに失敗した場合だけコード生成音を使う。第3リールが止まった時点で、再生中の効果音(長い `tick` など)はすべて停止し、その後に結果の音を鳴らす。
+- ルーレットUI・図柄画像・効果音はローカルプレイヤーのアバター生成時に先読みし、以後は同じUI・リソースを使う。外部音源がない効果音だけ波形を生成してFMODに登録し、初回スピン時の同期処理と未使用の音源生成を避ける。画像・音の差し替え後は再起動が必要。
 - カテゴリーは「ギャンブル」(ID `Gambling`)。ゲームに該当カテゴリーは無く、登録APIも無いので、`ItemDatabase` の非公開辞書 `itemCategories` に既存カテゴリー「交渉(Savvy)」を `Object.Instantiate` して登録する。`setStatus` は空にし、`comboEffectPrefab` は専用の `RouletteGamblingComboEffect` に差し替える。アイコンは複製元のもの。
 - 解放: `PlayerSpawner.OnStartServer` が `Resources.LoadAll` したアイテムだけを `unlockedCharms` に入れるため、MODのアイテムは自動では解放されない。Harmonyの Postfix で `unlockedCharms` にIDを追加している。`activeType = Default` だけでは解放されない。
 - `ItemDatabase.Register(ItemEntity)` が `OnLoadItemDatabase` 中に使える。既存アーティファクト(ID 1064)を `Object.Instantiate` で複製し、IDは `100000`。
@@ -71,7 +71,7 @@
 - 無敵バフがローカルプレイヤーに付いている間は、`RouletteInvulnerabilityUI` が画面外枠のグラデーションの虹色グローと、縁に沿ってきらめく星(実行時に生成したスプライト)を表示する。
 - バフ欄の表示にはバフの `HUD_ID` が必要で、`Resources/EffectHUD` に該当するエンティティが無いと `HUD Entity = ... を探せません` とログに出て何も表示されない。そのため `RouletteBuffHUD` が `EffectHUDDatabase.Initialize` の後(とMOD読み込み後)に、コードで組み立てたHUDプレハブを持つ `EffectHUDEntity` を辞書へ追加する。バフの名前・説明は `Localization/ja-JP.json` の `buff-*` キー。当たり時のバフアイコンは出目に合わせ、中は `symbol_bell.png`、大は `symbol_bar.png`、ジャックポットの攻撃強化と無敵は `symbol_seven.png` を使う。熱狂・連勝・フィーバーはそれぞれ `progress_heat_icon.png`、`progress_streak_icon.png`、`progress_fever_icon.png` を使う。全カスタムバフは暗い赤紫の背景に、バフ種別ごとの色で四隅のピクセル飾りを付ける。それ以外は `icon.png` を使う。画像を変更した公開版はReleaseビルドで `package/` を更新し、ワークショップへ再アップロードする。
 - 範囲ダメージは `DamageInstance.GetDamage(...)` + `UnitAvatar.ApplyDamage`。ダメージ一覧の分類名には当たりごとのMOD翻訳キー(`damage-roulette-small/mid/big/jackpot`)を `LocalizedString` で解決して渡す。生のキーを渡すとダメージ一覧にキー名が表示される。敵味方の判定は `GetHostileFactionLayers` を渡して `ApplyDamage` 側に任せる。
-- UIはUnityのCanvas(ScreenSpaceOverlay)をコードで生成する。初回生成時に図柄・背景画像を読み込み、効果音の波形を生成してFMODに登録したうえで、対応する音声ファイルがあればそちらを使う。`Entry.HandlePlayerSpawnedClient` からローカルプレイヤー生成時に `RouletteUI.Preload` を呼び、初回スピンから初期化負荷を切り離す。
+- UIはUnityのCanvas(ScreenSpaceOverlay)をコードで生成する。初回生成時に図柄・背景画像を読み込み、効果音ファイルを優先して使い、音源がない効果音だけ波形を生成してFMODに登録する。`Entry.HandlePlayerSpawnedClient` からローカルプレイヤー生成時に `RouletteUI.Preload` を呼び、初回スピンから初期化負荷を切り離す。
 - アーティファクトのアイコンは `images/roulette/` の画像を読み込み、無ければ `RouletteArtifact.CreateIcon` の仮アイコンを使う。
 
 ## 制限・未確認事項
