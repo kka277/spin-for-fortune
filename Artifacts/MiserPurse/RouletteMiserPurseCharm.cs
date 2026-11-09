@@ -2,12 +2,10 @@ namespace SpinForFortune
 {
     public class RouletteMiserPurseCharm : RouletteModifierCharm
     {
-        public const int ItemId = 100004;
-
         protected override void Modify(RouletteParams parameters)
         {
-            parameters.moneyCostMultiplier *= 0.6f;
-            parameters.cooldownMultiplier *= 1.2f;
+            parameters.moneyCostMultiplier *= 1f - 0.4f * EffectLevelProgress;
+            parameters.cooldownMultiplier *= 1f + 0.2f * EffectLevelProgress;
         }
     }
 }

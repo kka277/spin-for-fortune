@@ -1,6 +1,7 @@
 /bin/
 /obj/
 /package/
+/game-image-extract/
 /uploadticket.json
 /.vs/
 *.user

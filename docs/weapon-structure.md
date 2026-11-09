@@ -1,6 +1,7 @@
 # 武器の構造と登録（調査メモ）
 
 ゲームバージョン 1.1.0 の `Assembly-CSharp.dll` を調べた結果です。
+以下は調査記録です。現在のMODはテスト用武器を登録・表示していません。
 
 ## 構成
 
@@ -15,7 +16,7 @@
 
 - `OnLoadWeaponDatabase` で `WeaponDatabase.Register(WeaponEntity)` を呼びます。
 - 進化関係の集計は `OnLoadWeaponDatabase` の後に行われるため、このイベント内で `standardEnhancements` を設定すれば反映されます。
-- 既存の武器を `Object.Instantiate` で複製して、`id`、`aName`、`standardEnhancements` を差し替える方法を使っています。
+- 過去のテスト実装では既存の武器を `Object.Instantiate` で複製し、`id`、`aName`、`standardEnhancements` を差し替えていました。現在このテスト用武器登録は削除されています。
 - 複製した武器の `standardEnhancements` を空にしないと、複製元の進化先が自分の進化先として表示されます。
 - 複製元の `enhanceFromId` が残っていると、複製元の進化先に混ざるため、`-1` にします。
 
@@ -32,13 +33,13 @@
 - そのため進化の連なりを複製するときは、`standardEnhancements` に加えて、全武器から `enhanceFromId == 親のID` の武器も探します。
 - `GetBaseWeapons` には杖が含まれないため、複製元は `FindWeaponById(500)` で取得します。
 
-## 武器置き場（TownWeaponStand）
+## 武器置き場（TownWeaponStand）の調査メモ
 
 - 街や訓練場の武器の台は `TownWeaponStand`（`weapon` に `WeaponEntity` を持つ）です。触れると `EquipWeapon` で装備し、`StartingWeaponID` を保存します。
-- 台は各フロアに置かれたシーンのオブジェクトなので、`OnFloorAllocatedClientside` の後に `FindObjectsByType<TownWeaponStand>` で探し、既存の台を複製して追加します。
-- 台は近い位置ごとにまとめ、組ごとに一番右の台の隣へ置きます。間隔は既存の台の最小間隔に合わせます。
-- 複製した台は `NetworkIdentity` を外し、`weapon` をテスト用の武器種にします。台の上の絵は、名前が `Sword` のレンダラーを `icon` に差し替えます。
-- 台の追加は、ゲームの読み込み完了を待つため、フロア読み込みから最大20秒間、毎フレーム探します。
+- 過去のテスト用武器の調査では、`OnFloorAllocatedClientside` の後に `FindObjectsByType<TownWeaponStand>` で台を探し、既存の台を複製する方法を確認しました。現在はテスト用の台を追加していません。
+- 台は近い位置ごとにまとめ、組ごとに一番右の台の隣へ置けます。間隔は既存の台の最小間隔に合わせられます。
+- 複製した台から `NetworkIdentity` を外し、`weapon` と台の上の絵（`Sword` レンダラー）を差し替える方法を確認しました。
+- ゲーム読み込み完了まで最大20秒間探す方法も調査しました。
 
 ## 入手
 

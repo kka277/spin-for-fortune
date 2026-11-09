@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <Compile Include="Entry.cs" />
+    <Compile Include="Artifacts\ItemIds.cs" />
     <Compile Include="Artifacts\Roulette\RouletteTable.cs" />
     <Compile Include="Artifacts\Roulette\RouletteCharm.cs" />
     <Compile Include="Artifacts\Roulette\Buffs\RouletteBuffs.cs" />

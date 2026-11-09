@@ -60,11 +60,6 @@ namespace SpinForFortune
         private const float FadeSeconds = 0.4f;
         private static readonly Vector2 PanelBasePosition = new Vector2(-190f, 60f);
 
-        public static void Play(RouletteSpin spin)
-        {
-            Play(spin, 0, 0);
-        }
-
         public static void Play(RouletteSpin spin, int freeNumber, int freeLimit)
         {
             Preload();

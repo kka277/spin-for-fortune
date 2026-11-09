@@ -9,7 +9,7 @@
 ## 追加手順
 
 1. **一意なIDと名前キーを決める**
-   - 他MODと衝突しないIDを選び、コード内で定数にします。例: `RouletteSpeedUpCharm.ItemId = 100001`。
+   - 他MODと衝突しないIDを選び、`Artifacts/Roulette/ItemIds.cs` に定数を追加します。アイテムIDはここで一元管理し、登録定義などから `ItemIds.RouletteSpeedUp` のように参照します。
    - `ItemEntity.name` は `<ID>_<slug>` 形式にします(例: `100001_roulette-speedup`)。ローカライズキーにはMOD IDを含め、`<modId>:<slug>-name` のようにします。`modId` は `metadata.json` の値を使います。
 2. **効果クラスを作る**
    - `Charm_Basic` を継承し、効果やイベント購読を実装します。
@@ -96,7 +96,7 @@ namespace SpinForFortune
 | `ItemDatabase.FindItemById(int)` | 既存アイテムをIDで取得する。複製元の確認やID重複チェックに使う。 |
 | `ItemDatabase.Register(ItemEntity)` | 作成したアイテムをDBへ登録する。`OnLoadItemDatabase` 中に呼び出す。 |
 | `ItemEntity` | `id`, `name`, `aName`, `aFlavorText`, `rarity`, `cost`, `customCost`, `activeType`, `categories`, `icon`, `iconInWorld`, `resourcePrefab` などを設定する。 |
-| `Charm_Basic` | アーティファクトの効果コンポーネントの基底クラス。`OnEnabledEffect` / `OnDisabledEffect` / `OnUpdate`、`NetworkAvatar`、`IsEffectEnabled`、`maxLevel`、`effectsString` を利用する。 |
+| `Charm_Basic` | アーティファクトの効果コンポーネントの基底クラス。`OnEnabledEffect` / `OnDisabledEffect` / `OnUpdate`、`NetworkAvatar`、`IsEffectEnabled`、`maxLevel`、`limitedEffectEnabledLevel`、`effectsString` を利用する。レベル依存の効果は、現在有効な上限適用済みレベル `limitedEffectEnabledLevel` を参照する。 |
 | `NetworkAvatar.OnAttackUnit` | 攻撃イベント。ハンドラー例は `Action<UnitAvatar, DamageInstance>`。有効化時に購読し、無効化時に必ず解除する。 |
 | `UnitAvatar` | 効果対象のAPI。ルーレット実装では `HasMoney` / `SubMoney` / `AddMoney`、`hp` / `Networkhp`、`HealPercent`、`ApplyBuff`、`ApplyDamage` などを使用している。 |
 | `DamageInstance.GetDamage(...)` | ダメージインスタンスを作成する。作成後に属性を設定し、`UnitAvatar.ApplyDamage` で適用する。 |

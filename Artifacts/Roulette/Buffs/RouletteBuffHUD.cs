@@ -1,36 +1,32 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace SpinForFortune
 {
-    // バフHUDは Resources/EffectHUD のエンティティから作られるため、ルーレット用のHUDをコードで組み立てて辞書に追加する。
+    // バフHUDは Resources/EffectHUD のエンティティから作られるため、バニラのプレハブを複製して辞書に追加する。
     [HarmonyLib.HarmonyPatch(typeof(EffectHUDDatabase), nameof(EffectHUDDatabase.Initialize))]
     public static class RouletteBuffHUD
     {
         private const string IdPrefix = "PHYSICALDAMAGEPLUS_ROULETTE_";
         public const string InvulnerabilityId = IdPrefix + "INVULNERABLE";
-        private const float HudSize = 16f;
-        private static readonly Color FrameColor = new Color(0.16f, 0.04f, 0.08f);
 
         private class Definition
         {
             public string id;
             public string slug; // ローカライズキーの元になる名前
             public string iconFile;
-            public Color accentColor;
             public bool showStackOneText;
         }
 
         private static readonly Definition[] Definitions =
         {
-            new Definition { id = DamageId("mid"), slug = "damage-mid", iconFile = "symbol_bell.png", accentColor = new Color(0.95f, 0.72f, 0.2f) },
-            new Definition { id = DamageId("big"), slug = "damage-big", iconFile = "symbol_bar.png", accentColor = new Color(0.88f, 0.22f, 0.16f) },
-            new Definition { id = DamageId("jackpot"), slug = "damage-jackpot", iconFile = "symbol_seven.png", accentColor = new Color(1f, 0.82f, 0.2f) },
-            new Definition { id = InvulnerabilityId, slug = "invulnerable", iconFile = "symbol_seven.png", accentColor = new Color(0.72f, 0.85f, 1f) },
-            new Definition { id = ProgressId("heat"), slug = "progress-heat", iconFile = "progress_heat_icon.png", accentColor = new Color(1f, 0.38f, 0.12f), showStackOneText = true },
-            new Definition { id = ProgressId("streak"), slug = "progress-streak", iconFile = "progress_streak_icon.png", accentColor = new Color(0.95f, 0.72f, 0.2f), showStackOneText = true },
-            new Definition { id = ProgressId("fever"), slug = "progress-fever", iconFile = "progress_fever_icon.png", accentColor = new Color(1f, 0.88f, 0.32f) },
+            new Definition { id = DamageId("mid"), slug = "damage-mid", iconFile = "symbol_bell.png" },
+            new Definition { id = DamageId("big"), slug = "damage-big", iconFile = "symbol_bar.png" },
+            new Definition { id = DamageId("jackpot"), slug = "damage-jackpot", iconFile = "symbol_seven.png" },
+            new Definition { id = InvulnerabilityId, slug = "invulnerable", iconFile = "symbol_seven.png" },
+            new Definition { id = ProgressId("heat"), slug = "progress-heat", iconFile = "progress_heat_icon.png", showStackOneText = true },
+            new Definition { id = ProgressId("streak"), slug = "progress-streak", iconFile = "progress_streak_icon.png", showStackOneText = true },
+            new Definition { id = ProgressId("fever"), slug = "progress-fever", iconFile = "progress_fever_icon.png" },
         };
 
         private static readonly Dictionary<string, EffectHUDEntity> entities = new Dictionary<string, EffectHUDEntity>();
@@ -66,10 +62,14 @@ namespace SpinForFortune
             {
                 if (!entities.TryGetValue(definition.id, out var entity) || entity == null)
                 {
+                    var prefab = BuildPrefab(definition);
+                    if (prefab == null)
+                        continue;
+
                     entity = ScriptableObject.CreateInstance<EffectHUDEntity>();
                     entity.name = definition.id;
                     entity.id = definition.id;
-                    entity.hudPrefab = BuildPrefab(definition);
+                    entity.hudPrefab = prefab;
                     entities[definition.id] = entity;
                 }
                 dictionary[definition.id] = entity;
@@ -78,51 +78,34 @@ namespace SpinForFortune
 
         private static GameObject BuildPrefab(Definition definition)
         {
-            var root = new GameObject(definition.id, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement), typeof(UI_BuffHUD));
-            root.transform.SetParent(RouletteArtifact.GetPrefabHolder().transform, false);
-            root.GetComponent<RectTransform>().sizeDelta = new Vector2(HudSize, HudSize);
+            var source = FindVanillaBuffPrefab();
+            if (source == null)
+            {
+                Debug.LogError($"[SpinForFortune] バニラのバフHUDプレハブが見つかりません。作成できません: {definition.id}");
+                return null;
+            }
 
-            var layout = root.GetComponent<LayoutElement>();
-            layout.minWidth = layout.preferredWidth = HudSize;
-            layout.minHeight = layout.preferredHeight = HudSize;
+            var root = Object.Instantiate(source, RouletteArtifact.GetPrefabHolder().transform);
+            root.name = definition.id;
+            var hud = root.GetComponent<UI_BuffHUD>();
+            var icon = root.GetComponent<UnityEngine.UI.Image>();
+            if (hud == null || icon == null)
+            {
+                Debug.LogError($"[SpinForFortune] バニラのバフHUDプレハブの構成が不正です: {source.name}");
+                Object.Destroy(root);
+                return null;
+            }
 
-            var frame = root.GetComponent<Image>();
-            frame.color = FrameColor;
-
-            var solid = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height), new Vector2(0.5f, 0.5f));
-
-            var icon = CreateChild(root.transform, "Icon", 1f);
-            icon.sprite = RouletteArtifact.LoadIcon(definition.iconFile ?? "icon.png", null);
-            icon.color = icon.sprite != null ? Color.white : new Color(0.3f, 0.1f, 0.15f);
-            icon.preserveAspect = true;
-            icon.raycastTarget = false;
-
-            var shadowAccent = definition.accentColor * 0.55f;
-            AddCornerMark(root.transform, "TopLeftAccent", new Vector2(0f, 1f), new Vector2(1f, -1f), solid, definition.accentColor);
-            AddCornerMark(root.transform, "TopRightAccent", Vector2.one, new Vector2(-1f, -1f), solid, shadowAccent);
-            AddCornerMark(root.transform, "BottomLeftAccent", Vector2.zero, new Vector2(1f, 1f), solid, shadowAccent);
-            AddCornerMark(root.transform, "BottomRightAccent", new Vector2(1f, 0f), new Vector2(-1f, 1f), solid, definition.accentColor);
-
-            // 経過に応じて暗くなるタイマー表示。
-            var fill = CreateChild(root.transform, "Fill", 1f);
-            fill.sprite = solid;
-            fill.color = new Color(0f, 0f, 0f, 0.55f);
-            fill.type = Image.Type.Filled;
-            fill.fillMethod = Image.FillMethod.Radial360;
-            fill.fillOrigin = (int)Image.Origin360.Top;
-            fill.fillClockwise = false;
-            fill.fillAmount = 0f;
-            fill.raycastTarget = false;
-
-            var overlay = CreateChild(root.transform, "WhiteOverlay", 0f);
-            overlay.color = new Color(1f, 1f, 1f, 0f);
-            overlay.raycastTarget = false;
+            var sprite = RouletteArtifact.LoadIcon(definition.iconFile, null);
+            if (sprite != null)
+            {
+                icon.sprite = sprite;
+                icon.color = Color.white;
+            }
+            else
+                Debug.LogWarning($"[SpinForFortune] バフアイコン画像を読み込めません。バニラの画像を使います: {definition.iconFile}");
 
             string modId = RouletteArtifact.ModId;
-            var hud = root.GetComponent<UI_BuffHUD>();
-            hud.buffFillImage = fill;
-            hud.whiteOverlayImage = overlay;
-            hud.stackText = CreateStackText(root.transform);
             hud.showStackOneText = definition.showStackOneText;
             hud.effectType = UI_EffectHUD_Basic.EEffectType.Boon;
             hud.effectName = new LocalizedString($"{modId}:buff-{definition.slug}-name");
@@ -130,24 +113,7 @@ namespace SpinForFortune
             return root;
         }
 
-        private static void AddCornerMark(Transform parent, string name, Vector2 anchor, Vector2 position, Sprite sprite, Color color)
-        {
-            var image = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image)).GetComponent<Image>();
-            image.transform.SetParent(parent, false);
-            image.sprite = sprite;
-            image.color = color;
-            image.raycastTarget = false;
-
-            var rect = image.rectTransform;
-            rect.anchorMin = anchor;
-            rect.anchorMax = anchor;
-            rect.pivot = anchor;
-            rect.sizeDelta = new Vector2(2f, 2f);
-            rect.anchoredPosition = position;
-        }
-
-        // バニラのバフHUDのスタック数テキストを探し、見た目をそのまま流用する。
-        private static TMPro.TextMeshProUGUI FindVanillaStackText()
+        private static GameObject FindVanillaBuffPrefab()
         {
             var field = typeof(EffectHUDDatabase).GetField("effectHUDDictionary", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
             var dictionary = field?.GetValue(null) as Dictionary<string, EffectHUDEntity>;
@@ -158,58 +124,14 @@ namespace SpinForFortune
             {
                 if (pair.Key.StartsWith(IdPrefix) || pair.Value == null || pair.Value.hudPrefab == null)
                     continue;
-                var hud = pair.Value.hudPrefab.GetComponent<UI_BuffHUD>();
-                if (hud != null && hud.stackText != null)
-                    return hud.stackText;
+
+                var prefab = pair.Value.hudPrefab;
+                var hud = prefab.GetComponent<UI_BuffHUD>();
+                if (hud != null && hud.buffFillImage != null && hud.whiteOverlayImage != null && hud.stackText != null &&
+                    prefab.GetComponent<UnityEngine.UI.Image>() != null)
+                    return prefab;
             }
             return null;
-        }
-
-        // バニラが見つからない場合のみ、独自にTMPテキストを作る。
-        private static TMPro.TextMeshProUGUI CreateStackText(Transform parent)
-        {
-            var vanilla = FindVanillaStackText();
-            if (vanilla != null)
-            {
-                var clone = Object.Instantiate(vanilla.gameObject, parent, false);
-                clone.name = "StackText";
-                var cloned = clone.GetComponent<TMPro.TextMeshProUGUI>();
-                cloned.text = "";
-                return cloned;
-            }
-
-            var go = new GameObject("StackText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TMPro.TextMeshProUGUI));
-            go.transform.SetParent(parent, false);
-            var rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = new Vector2(1f, 0f);
-
-            var text = go.GetComponent<TMPro.TextMeshProUGUI>();
-            var fonts = Resources.FindObjectsOfTypeAll<TMPro.TMP_FontAsset>();
-            if (fonts.Length > 0)
-                text.font = fonts[0];
-            text.fontSize = 8f;
-            text.fontStyle = TMPro.FontStyles.Bold;
-            text.alignment = TMPro.TextAlignmentOptions.BottomRight;
-            text.color = Color.white;
-            text.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
-            text.raycastTarget = false;
-            text.text = "";
-            return text;
-        }
-
-        private static Image CreateChild(Transform parent, string childName, float inset)
-        {
-            var child = new GameObject(childName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            child.transform.SetParent(parent, false);
-            var rect = child.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = new Vector2(inset, inset);
-            rect.offsetMax = new Vector2(-inset, -inset);
-            return child.GetComponent<Image>();
         }
     }
 }

@@ -2,12 +2,10 @@ namespace SpinForFortune
 {
     public class RouletteBloodContractCharm : RouletteModifierCharm
     {
-        public const int ItemId = 100005;
-
         protected override void Modify(RouletteParams parameters)
         {
-            parameters.hpCostMultiplier *= 0.5f;
-            parameters.moneyCostMultiplier *= 1.2f;
+            parameters.hpCostMultiplier *= 1f - 0.5f * EffectLevelProgress;
+            parameters.moneyCostMultiplier *= 1f + 0.2f * EffectLevelProgress;
         }
     }
 }

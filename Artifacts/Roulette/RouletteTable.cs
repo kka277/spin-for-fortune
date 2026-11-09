@@ -30,7 +30,6 @@ namespace SpinForFortune
     // 抽選テーブルと調整用の定数。数値を変える場合はここだけを触る。
     public static class RouletteTable
     {
-        public const int ItemId = 100000;
         public const int MoneyCost = 30;
         public const int HpCost = 5;
         public const float Cooldown = 0.5f;

@@ -222,7 +222,7 @@ namespace SpinForFortune
             if (RouletteProgression.GetFeverSeconds(NetworkAvatar) > 0f)
                 reward *= RouletteProgression.FeverRewardMultiplier;
 
-            RouletteProgression.RecordOutcome(NetworkAvatar, spin.tier, spin.reach);
+            RouletteProgression.RecordOutcome(NetworkAvatar, spin.tier);
             switch (spin.tier)
             {
                 case RouletteTier.Small:

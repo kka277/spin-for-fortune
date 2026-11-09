@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace SpinForFortune
@@ -7,6 +8,9 @@ namespace SpinForFortune
     public abstract class RouletteModifierCharm : Charm_Basic
     {
         private static readonly List<RouletteModifierCharm> Active = new List<RouletteModifierCharm>();
+
+        protected int EffectLevel => Math.Max(1, Math.Min(maxLevel, limitedEffectEnabledLevel));
+        protected float EffectLevelProgress => EffectLevel / (float)maxLevel;
 
         // owner が装備中の強化アーティファクトをすべて反映した調整値を返す。
         public static RouletteParams Collect(UnitAvatar owner)

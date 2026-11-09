@@ -102,8 +102,6 @@ namespace SpinForFortune
     {
         private const string ProgressMessagePrefix = "SpinForFortune:roulette-progress:";
         private static readonly Dictionary<UnitAvatar, ProgressState> States = new Dictionary<UnitAvatar, ProgressState>();
-        private static RouletteProgressSnapshot clientSnapshot;
-        private static bool hasClientSnapshot;
 
         private sealed class ProgressState
         {
@@ -226,7 +224,7 @@ namespace SpinForFortune
                 return;
 
             state.ResetForDeath = true;
-            Reset(owner, state, false);
+            Reset(owner, state);
         }
 
         internal static void Tick(UnitAvatar owner, float deltaTime)
@@ -269,7 +267,7 @@ namespace SpinForFortune
                     : 0f;
         }
 
-        internal static void RecordOutcome(UnitAvatar owner, RouletteTier tier, bool reach)
+        internal static void RecordOutcome(UnitAvatar owner, RouletteTier tier)
         {
             if (owner == null || !States.TryGetValue(owner, out var state) ||
                 !state.ComboActive)
@@ -286,14 +284,21 @@ namespace SpinForFortune
                 int streakBonus = Math.Min(2, Math.Max(0, state.Snapshot.Streak - 1) / 2);
                 state.Snapshot.Heat = Math.Min(MaxHeat, state.Snapshot.Heat + baseHeat + streakBonus);
 
-                if (tier == RouletteTier.Small)
-                    state.Snapshot.SmallWins = Increment(state.Snapshot.SmallWins);
-                else if (tier == RouletteTier.Mid)
-                    state.Snapshot.MidWins = Increment(state.Snapshot.MidWins);
-                else if (tier == RouletteTier.Big)
-                    state.Snapshot.BigWins = Increment(state.Snapshot.BigWins);
-                else if (tier == RouletteTier.Jackpot)
-                    state.Snapshot.JackpotWins = Increment(state.Snapshot.JackpotWins);
+                switch (tier)
+                {
+                    case RouletteTier.Small:
+                        state.Snapshot.SmallWins = Increment(state.Snapshot.SmallWins);
+                        break;
+                    case RouletteTier.Mid:
+                        state.Snapshot.MidWins = Increment(state.Snapshot.MidWins);
+                        break;
+                    case RouletteTier.Big:
+                        state.Snapshot.BigWins = Increment(state.Snapshot.BigWins);
+                        break;
+                    case RouletteTier.Jackpot:
+                        state.Snapshot.JackpotWins = Increment(state.Snapshot.JackpotWins);
+                        break;
+                }
 
                 if (state.Snapshot.Heat >= MaxHeat)
                 {
@@ -320,19 +325,8 @@ namespace SpinForFortune
             }
         }
 
-        internal static RouletteProgressSnapshot GetDisplaySnapshot(UnitAvatar avatar)
+        internal static void ResetClientFever()
         {
-            if (avatar != null && avatar.isLocalPlayer && hasClientSnapshot)
-                return clientSnapshot;
-            if (avatar != null && States.TryGetValue(avatar, out var state))
-                return state.Snapshot;
-            return new RouletteProgressSnapshot();
-        }
-
-        internal static void ResetClientSnapshot()
-        {
-            clientSnapshot = new RouletteProgressSnapshot();
-            hasClientSnapshot = true;
             RouletteUI.SetFever(0f);
         }
 
@@ -342,44 +336,23 @@ namespace SpinForFortune
                 return false;
 
             var values = message.Substring(ProgressMessagePrefix.Length).Split('|');
-            if (values.Length != 8 ||
-                !TryParseNonNegative(values[0], out int smallWins) ||
-                !TryParseNonNegative(values[1], out int midWins) ||
-                !TryParseNonNegative(values[2], out int bigWins) ||
-                !TryParseNonNegative(values[3], out int jackpotWins) ||
-                !TryParseNonNegative(values[4], out int heat) ||
-                heat >= MaxHeat ||
-                !TryParseNonNegative(values[5], out int streak) ||
-                !float.TryParse(values[6], NumberStyles.Float, CultureInfo.InvariantCulture, out float feverSeconds) ||
+            if (values.Length != 1 ||
+                !float.TryParse(values[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float feverSeconds) ||
                 feverSeconds < 0f || feverSeconds > MaxFeverDuration ||
-                float.IsNaN(feverSeconds) || float.IsInfinity(feverSeconds) ||
-                (values[7] != "0" && values[7] != "1"))
+                float.IsNaN(feverSeconds) || float.IsInfinity(feverSeconds))
             {
                 UnityEngine.Debug.LogWarning("[SpinForFortune] ルーレット成長メッセージの形式が不正です。");
                 return true;
             }
 
-            clientSnapshot = new RouletteProgressSnapshot
-            {
-                SmallWins = smallWins,
-                MidWins = midWins,
-                BigWins = bigWins,
-                JackpotWins = jackpotWins,
-                Heat = heat,
-                Streak = streak,
-                FeverSeconds = feverSeconds
-            };
-            hasClientSnapshot = true;
             RouletteUI.SetFever(feverSeconds);
             return true;
         }
 
-        private static void Reset(UnitAvatar owner, ProgressState state, bool removeState)
+        private static void Reset(UnitAvatar owner, ProgressState state)
         {
             state.Snapshot = new RouletteProgressSnapshot();
             Publish(owner, state.Snapshot, state.ComboActive);
-            if (removeState)
-                States.Remove(owner);
         }
 
         private static void Publish(UnitAvatar owner, RouletteProgressSnapshot snapshot, bool active)
@@ -392,14 +365,12 @@ namespace SpinForFortune
 
             if (owner.isLocalPlayer)
             {
-                clientSnapshot = snapshot;
-                hasClientSnapshot = true;
                 RouletteUI.SetFever(snapshot.FeverSeconds);
                 return;
             }
 
             if (owner.connectionToClient != null)
-                owner.TargetSendCustomMessage(owner.connectionToClient, Serialize(snapshot, active));
+                owner.TargetSendCustomMessage(owner.connectionToClient, Serialize(snapshot));
         }
 
         private static void UpdateProgressBuffs(UnitAvatar owner, RouletteProgressSnapshot snapshot, bool active)
@@ -459,22 +430,9 @@ namespace SpinForFortune
             timer.Ratio = 1f - UnityEngine.Mathf.Clamp01(remaining / MaxFeverDuration);
         }
 
-        private static string Serialize(RouletteProgressSnapshot snapshot, bool active)
+        private static string Serialize(RouletteProgressSnapshot snapshot)
         {
-            return ProgressMessagePrefix +
-                snapshot.SmallWins.ToString(CultureInfo.InvariantCulture) + "|" +
-                snapshot.MidWins.ToString(CultureInfo.InvariantCulture) + "|" +
-                snapshot.BigWins.ToString(CultureInfo.InvariantCulture) + "|" +
-                snapshot.JackpotWins.ToString(CultureInfo.InvariantCulture) + "|" +
-                snapshot.Heat.ToString(CultureInfo.InvariantCulture) + "|" +
-                snapshot.Streak.ToString(CultureInfo.InvariantCulture) + "|" +
-                snapshot.FeverSeconds.ToString("R", CultureInfo.InvariantCulture) + "|" +
-                (active ? "1" : "0");
-        }
-
-        private static bool TryParseNonNegative(string value, out int result)
-        {
-            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result) && result >= 0;
+            return ProgressMessagePrefix + snapshot.FeverSeconds.ToString("R", CultureInfo.InvariantCulture);
         }
 
         private static int Increment(int value)

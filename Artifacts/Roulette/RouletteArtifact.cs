@@ -6,7 +6,6 @@ namespace SpinForFortune
     // 既存アーティファクトを複製して、伝説アーティファクト「ルーレット」と、その強化アーティファクトをアイテムDBに登録する。
     public static class RouletteArtifact
     {
-        private const int TemplateItemId = 1064;
         private static GameObject prefabHolder;
         private static readonly List<KeyValuePair<string, GameObject>> pendingPrefabs = new List<KeyValuePair<string, GameObject>>();
         private static readonly System.Random grantSeedRandom = new System.Random();
@@ -38,6 +37,7 @@ namespace SpinForFortune
             public string slug; // 名前・説明・プレハブのキーの元になる名前
             public EItemRarity rarity;
             public int cost;
+            public int maxLevel = 1;
             public System.Type charmType;
             public string iconFile;
             public bool uniqueEffect;
@@ -45,22 +45,22 @@ namespace SpinForFortune
 
         private static readonly Definition[] Definitions =
         {
-            new Definition { id = RouletteTable.ItemId, slug = "roulette", rarity = EItemRarity.Legend, cost = 1200, charmType = typeof(RouletteCharm), iconFile = "icon.png", uniqueEffect = true },
-            new Definition { id = RouletteSpeedUpCharm.ItemId, slug = "roulette-speedup", rarity = EItemRarity.Rare, cost = 500, charmType = typeof(RouletteSpeedUpCharm), iconFile = "speedup_icon.png" },
-            new Definition { id = RouletteLuckyHorseshoeCharm.ItemId, slug = "roulette-lucky-horseshoe", rarity = EItemRarity.Rare, cost = 600, charmType = typeof(RouletteLuckyHorseshoeCharm), iconFile = "lucky_horseshoe_icon.png" },
-            new Definition { id = RouletteGreedyWagerCharm.ItemId, slug = "roulette-greedy-wager", rarity = EItemRarity.Legend, cost = 900, charmType = typeof(RouletteGreedyWagerCharm), iconFile = "greedy_wager_icon.png" },
-            new Definition { id = RouletteMiserPurseCharm.ItemId, slug = "roulette-miser-purse", rarity = EItemRarity.Rare, cost = 500, charmType = typeof(RouletteMiserPurseCharm), iconFile = "miser_purse_icon.png" },
-            new Definition { id = RouletteBloodContractCharm.ItemId, slug = "roulette-blood-contract", rarity = EItemRarity.Rare, cost = 500, charmType = typeof(RouletteBloodContractCharm), iconFile = "blood_contract_icon.png" },
-            new Definition { id = RouletteFeverAmuletCharm.ItemId, slug = "roulette-fever-amulet", rarity = EItemRarity.Legend, cost = 800, charmType = typeof(RouletteFeverAmuletCharm), iconFile = "fever_amulet_icon.png" },
+            new Definition { id = ItemIds.Roulette, slug = "roulette", rarity = EItemRarity.Legend, cost = 1200, charmType = typeof(RouletteCharm), iconFile = "icon.png", uniqueEffect = true },
+            new Definition { id = ItemIds.RouletteSpeedUp, slug = "roulette-speedup", rarity = EItemRarity.Rare, cost = 500, maxLevel = 4, charmType = typeof(RouletteSpeedUpCharm), iconFile = "speedup_icon.png" },
+            new Definition { id = ItemIds.LuckyHorseshoe, slug = "roulette-lucky-horseshoe", rarity = EItemRarity.Rare, cost = 600, maxLevel = 5, charmType = typeof(RouletteLuckyHorseshoeCharm), iconFile = "lucky_horseshoe_icon.png" },
+            new Definition { id = ItemIds.GreedyWager, slug = "roulette-greedy-wager", rarity = EItemRarity.Legend, cost = 900, maxLevel = 3, charmType = typeof(RouletteGreedyWagerCharm), iconFile = "greedy_wager_icon.png" },
+            new Definition { id = ItemIds.MiserPurse, slug = "roulette-miser-purse", rarity = EItemRarity.Rare, cost = 500, maxLevel = 4, charmType = typeof(RouletteMiserPurseCharm), iconFile = "miser_purse_icon.png" },
+            new Definition { id = ItemIds.BloodContract, slug = "roulette-blood-contract", rarity = EItemRarity.Rare, cost = 500, maxLevel = 4, charmType = typeof(RouletteBloodContractCharm), iconFile = "blood_contract_icon.png" },
+            new Definition { id = ItemIds.FeverAmulet, slug = "roulette-fever-amulet", rarity = EItemRarity.Legend, cost = 800, maxLevel = 3, charmType = typeof(RouletteFeverAmuletCharm), iconFile = "fever_amulet_icon.png" },
         };
 
         public static void Register(string id)
         {
             modId = id;
-            var template = ItemDatabase.FindItemById(TemplateItemId);
+            var template = ItemDatabase.FindItemById(ItemIds.ArtifactTemplate);
             if (template == null || template.resourcePrefab == null || template.type != EItemType.Charm)
             {
-                Debug.LogError($"[SpinForFortune] 複製元のアーティファクト {TemplateItemId} が見つかりません。");
+                Debug.LogError($"[SpinForFortune] 複製元のアーティファクト {ItemIds.ArtifactTemplate} が見つかりません。");
                 return;
             }
 
@@ -285,7 +285,7 @@ namespace SpinForFortune
             }
 
             var inventory = owner.Inventory;
-            var roulette = ItemDatabase.FindItemById(RouletteTable.ItemId);
+            var roulette = ItemDatabase.FindItemById(ItemIds.Roulette);
             if (roulette == null)
             {
                 Debug.LogError("[SpinForFortune] ギャンブルコンボ発動時にルーレットを獲得できません。アイテムデータが見つかりません。");
@@ -293,7 +293,7 @@ namespace SpinForFortune
             }
 
             if (inventory.HasItem(roulette, out _, out _, out _) ||
-                inventory.TryGetSubBagItem(RouletteTable.ItemId, out _, out _))
+                inventory.TryGetSubBagItem(ItemIds.Roulette, out _, out _))
                 return;
 
             var additionResult = inventory.CanAddItem(roulette, 1);
@@ -341,7 +341,7 @@ namespace SpinForFortune
             Object.DestroyImmediate(old);
 
             var charm = (Charm_Basic)prefab.AddComponent(definition.charmType);
-            charm.maxLevel = 1;
+            charm.maxLevel = definition.maxLevel;
             charm.isUniqueEffect = definition.uniqueEffect;
             charm.effectsString = new[] { new LocalizedString($"{modId}:{definition.slug}-effect") };
             return prefab;
